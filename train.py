@@ -78,9 +78,6 @@ def main(args):
     saver = Saver(model=mod, save_best=True, save_path=save_path, monitor="val_loss", mode='min')
     callbacks = Callbacks([stopper, saver])
 
-    # for encoder only it is just empty, ADJUST for decoder then
-    metrics = Metrics(num_classes=3, device=device, top_k=1, thresh=0.5)
-
     # if args.weighted_loss:
     # if args.cropped_seq or args.cropped_seq_raw:
     #     weights = torch.tensor([0.62963445, 2.42849968], dtype=torch.float32)  # only m9
@@ -91,6 +88,9 @@ def main(args):
     loss_fn = SemanticLosses(alpha=1, gamma=2, lambdas=(0.5, 0.5), weight=None)  # maybe consider weights...
 
     opt = get_optimizer(mod, args.opt, args.lr0, momentum=args.momentum, weight_decay=args.weight_decay)
+
+    # for encoder only it is just empty, ADJUST for decoder then
+    metrics = Metrics(loss_fn=loss_fn, num_classes=3, device=device, top_k=1, thresh=0.5)
 
     # initializing loggers
     logger = Loggers(metrics=metrics, save_path=save_path, opt=opt, test=False)

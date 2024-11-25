@@ -13,11 +13,12 @@ class LogsHolder(BaseCallback):
         :param
             --metrics = metrics object
     """
-    def __init__(self, metrics, test=False):
+    def __init__(self, metrics, test=False, wandb=False):
         super().__init__()
         self.metrics = metrics
         self.dict = self.build_metrics_dict()
         self.test = test
+        self.wandb = wandb
 
     def build_metrics_dict(self):
         d = {key: [] for key in self.metrics.dict}
@@ -35,8 +36,8 @@ class LogsHolder(BaseCallback):
                     self.dict[key].append(self.metrics.dict[key][0])
                 else:
                     for i in range(len(self.metrics.dict[key])):
-                        self.dict[key+f"_{i}"].append(self.metrics.dict[key][i][0])
-                    flat = [item[0] for item in self.metrics.dict[key]]
+                        self.dict[key+f"_{i}"].append(self.metrics.dict[key][i])
+                    flat = [item for item in self.metrics.dict[key]]
                     self.dict[key].append(np.float16(sum(flat)/len(flat)))  # mean value
         else:
             for key in self.metrics.dict:
@@ -45,8 +46,8 @@ class LogsHolder(BaseCallback):
                         pass
                     else:
                         for i in range(len(self.metrics.dict[key])):
-                            self.dict[key+f"_{i}"].append(self.metrics.dict[key][i][0])
-                        flat = [item[0] for item in self.metrics.dict[key]]
+                            self.dict[key+f"_{i}"].append(self.metrics.dict[key][i])
+                        flat = [item for item in self.metrics.dict[key]]
                         self.dict[key].append(np.float16(sum(flat)/len(flat)))  # mean value
 
 
@@ -135,12 +136,13 @@ class SaveFigures(BaseCallback):
 
 
 class LrLogger(BaseCallback):
-    def __init__(self, opt, save_path):
+    def __init__(self, opt, save_path, wandb=False):
         super().__init__()
         self.opt = opt
         self.save_path = save_path
         self.log = []
         self.last_epoch = 0
+        self.wandb = wandb
 
     def on_epoch_end(self, epoch=None):
         self.log.append(self.opt.param_groups[0]["lr"])
@@ -354,7 +356,7 @@ class ConfusionMatrixLogger(BaseCallback):
 
 
 class Loggers(BaseCallback):
-    def __init__(self, metrics, opt, save_path, test, wandb=None):
+    def __init__(self, metrics, opt, save_path, test, wandb):
         super().__init__()
         self.logs = LogsHolder(metrics, test=test, wandb=wandb)
         self.csv = SaveCSV(self.logs, save_path, test=test)

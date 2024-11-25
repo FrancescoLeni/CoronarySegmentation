@@ -65,7 +65,6 @@ class ModelClass(nn.Module):
             raise TypeError("model not recognised")
 
         self.train_loader, self.val_loader = loaders
-
         if device == 'gpu':
             if torch.cuda.is_available():
                 self.device = 'cuda:0'
@@ -84,9 +83,9 @@ class ModelClass(nn.Module):
 
         self.callbacks = callbacks
 
-
         self.metrics = metrics
         self.metrics1 = None
+
         self.loggers = loggers
 
         if loss_fn:
@@ -102,8 +101,7 @@ class ModelClass(nn.Module):
             self.AMP = False
 
     def train_one_epoch(self, epoch_index, tot_epochs):
-        running_loss = 0.
-        last_loss = 0.
+        self.loss_fun.reset()
 
         # initializing progress bar
         description = 'Training'
@@ -139,9 +137,7 @@ class ModelClass(nn.Module):
 
             del inputs
 
-            running_loss += loss.item()
-            last_loss = running_loss #/ self.train_loader.batch_size  # loss per batch
-            running_loss = 0.
+            current_loss = self.loss_fun.get_current_value(batch)
 
             with torch.no_grad():
                 # computing training metrics
@@ -149,7 +145,7 @@ class ModelClass(nn.Module):
                 # calling callbacks
                 self.callbacks.on_train_batch_end(outputs.float(), labs, batch)
 
-            # updating pbar (ADJUST)
+            # updating pbar
             # if self.metrics.num_classes != 2:
             #     A = self.metrics.A.t_value_mean
             #     P = self.metrics.P.t_value_mean
@@ -163,17 +159,17 @@ class ModelClass(nn.Module):
 
             # pbar_loader.set_description(f'Epoch {epoch_index}/{tot_epochs-1}, GPU_mem: {gpu_used:.2f}/{self.gpu_mem:.2f}, '
             #                             f'train_loss: {last_loss:.4f}, A: {A :.2f}, P: {P :.2f}, R: {R :.2f}, AUC: {AUC :.2f}')
+
             pbar_loader.set_description(f'Epoch {epoch_index}/{tot_epochs - 1}, GPU_mem: {gpu_used:.2f}/{self.gpu_mem:.2f}, '
-                                        f'train_loss: {last_loss:.4f}')
+                                        f'train_loss: {current_loss:.4f}')
             if self.device != "cpu":
                 torch.cuda.synchronize()
 
         # updating dictionary
-        self.metrics.on_train_end(last_loss)
+        self.metrics.on_train_end(batch + 1)
 
     def val_loop(self, epoch):
-        running_loss = 0.0
-        last_loss = 0.0
+        self.loss_fun.reset()
 
         # resetting metrics for validation
         self.metrics.on_val_start()
@@ -198,24 +194,21 @@ class ModelClass(nn.Module):
 
                 outputs = self.model(inputs)
 
-                loss = self.loss_fun(outputs, labels)
+                _ = self.loss_fun(outputs, labels)
 
-                running_loss += loss.item()
-                last_loss = running_loss #/ self.val_loader.batch_size  # loss per batch
-                running_loss = 0.0
+                current_loss = self.loss_fun.get_current_value(batch)
 
                 if self.device != "cpu":
                     torch.cuda.synchronize()
 
                 # computing metrics on batch
-
                 self.metrics.on_val_batch_end(outputs.float(), labels, batch)
                 # calling callbacks
                 self.callbacks.on_val_batch_end(outputs, labels, batch)
                 # updating roc and prc
                 self.loggers.on_val_batch_end(outputs, labels, batch)
 
-                # updating pbar (ADJUST)
+                # # updating pbar
                 # if self.metrics.num_classes != 2:
                 #     A = self.metrics.A.v_value_mean
                 #     P = self.metrics.P.v_value_mean
@@ -228,12 +221,13 @@ class ModelClass(nn.Module):
                 #     AUC = self.metrics.AuC.v_value[1]
                 # description = f'Validation: val_loss: {last_loss:.4f}, val_A: {A :.2f}, ' \
                 #               f'val_P: {P :.2f}, val_R: {R :.2f}, val_AUC: {AUC :.2f}'
-                description = f'Validation: val_loss: {last_loss:.4f}'
+                description = f'Validation: val_loss: {current_loss:.4f}'
                 pbar_loader.set_description(description)
 
         if outputs is not None:
             # updating metrics dict
-            self.metrics.on_val_end(last_loss)
+            self.metrics.on_val_end(batch + 1)
+
             # updating loggers (roc, prc)
             self.loggers.on_val_end()
             # calling callbacks
@@ -246,8 +240,7 @@ class ModelClass(nn.Module):
             torch.cuda.empty_cache()
 
             self.metrics.on_epoch_start()
-            if self.bi_head:
-                self.metrics1.on_epoch_start()
+
             self.loggers.on_epoch_start(epoch=epoch, max_epoch=num_epochs)
 
             # self.model.train(True)
@@ -256,24 +249,18 @@ class ModelClass(nn.Module):
             # for name, param in self.model.named_parameters():
             #     self.my_logger.info(name, param.requires_grad)
 
-            # reshuffle for subsampling
-            self.train_loader.dataset.build()
             # 1 epoch train
             self.train_one_epoch(epoch, num_epochs)
 
-            # reshuffle for subsampling
-            self.val_loader.dataset.build()
             # validation
             self.val_loop(epoch)
 
             # logging results
             self.loggers.on_epoch_end(epoch)
-
             # updating lr scheduler
             if self.sched:
                 self.sched.step()
-
-            # resetting metrics
+            #resetting metrics
             self.metrics.on_epoch_end()
 
             # calling callbacks
