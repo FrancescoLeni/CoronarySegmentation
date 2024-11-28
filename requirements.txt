@@ -11,7 +11,7 @@ typing_extensions==4.9.0
 pandas==2.2.2
 torchmetrics
 timm
-nrrd
+pynrrd
 
 git+https://github.com/AAMIASoftwares-research/DatasetUtilities.git
 git+https://github.com/AAMIASoftwares-research/HCATNetwork.git
