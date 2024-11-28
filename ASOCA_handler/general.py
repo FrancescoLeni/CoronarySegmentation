@@ -9,6 +9,7 @@ from HearticDatasetManager.affine import apply_affine_3d
 
 import matplotlib.pyplot as plt
 import numpy as np
+from sklearn.cluster import DBSCAN
 
 
 def min_max(x):
@@ -120,4 +121,12 @@ def build_centerline_per_slice_dict(ijkgraph):
         z_dict[z_floored].append(node_id)
 
     return {k: z_dict[k] for k in sorted(z_dict.keys())}
+
+
+def get_slices_with_centerline(ijkgraph):
+    z_dict = build_centerline_per_slice_dict(ijkgraph)
+
+    idx = list(z_dict.keys())
+
+    return idx
 

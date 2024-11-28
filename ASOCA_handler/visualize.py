@@ -46,7 +46,7 @@ def plot_centerline_over_CT(image, graph_RAS):
     hcatnetwork.draw.draw_centerlines_graph_3d(graph_RAS, ax)
 
 
-def plot_slice_with_mask_and_centers(image, masks, graph_ijk, slice_num):
+def plot_slice_with_mask_and_centers(image, masks, graph_ijk, slice_num, ax=None, show=True, crop_center=False):
     """
         !!!!! NEEDS GRAPH IN IJK COORDINATES !!!!!
     args:
@@ -56,18 +56,35 @@ def plot_slice_with_mask_and_centers(image, masks, graph_ijk, slice_num):
         - slice_num: number of the slice to display. must be between (0, image.shape[3] -1)
 
     """
-    lab = masks[:, :, slice_num].astype(np.uint8)
+
 
     z_dict = build_centerline_per_slice_dict(graph_ijk)
 
     xy = np.array([[floor_or_ceil(graph_ijk.nodes[i]['x']), floor_or_ceil(graph_ijk.nodes[i]['y'])] for i in z_dict[slice_num]])
 
-    img = min_max(image.data[:, :, slice_num])
+    if crop_center:
+        dx = image.shape[0] // 2
+        c_i, c_j = crop_center
+        top_left_i, top_left_j = c_i - dx, c_j - dx
+        translated_points = [(xy_vect[0] - top_left_i, xy_vect[1] - top_left_j) for xy_vect in xy]
+        translated_points = np.array([[i, j] for i, j in translated_points if 0 <= j < image.shape[0] and 0 <= i < image.shape[0]])
+
+        xy = np.array(translated_points)
+
+        img = min_max(image)
+        lab = masks
+    else:
+        img = min_max(image.data[:, :, slice_num])
+        lab = masks[:, :, slice_num].astype(np.uint8)
 
     img[lab == 1] = 1
+    if not ax:
+        f, ax = plt.subplots(1, 1)
 
-    plt.imshow(img, cmap='gray')
-    plt.scatter(xy[:, 1], xy[:, 0], color='red', s=5)
-    plt.show()
+    ax.imshow(img, cmap='gray')
+    ax.scatter(xy[:, 1], xy[:, 0], color='red', s=5)
+
+    if show:
+        plt.show()
 
 

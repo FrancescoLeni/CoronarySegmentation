@@ -7,12 +7,15 @@ from PIL import Image
 # from sklearn.model_selection import train_test_split
 from collections import defaultdict
 
-from ..CholectinstanceSeg_utils import get_mask_from_json
-from ..mmi_dataset_utils import get_mask_from_txt
-
-from ..image_handling import center_crop_and_resize, pad_and_resize, mask_list_to_array
 from . import my_logger
 from .collates import imgs_masks_polys
+
+from ..ASOCA_handler.general import load_centerline, load_single_volume, align_centerline_to_image, \
+                                    get_slices_with_centerline
+
+from ..ASOCA_handler.clustering import get_slice_centroids
+
+from .augmentation import square_crop
 
 
 class DummyLoader(torch.utils.data.Dataset):
@@ -286,6 +289,81 @@ def load_all(img_paths: list, reshape_mode=None, reshaped_size=1024, batch_size=
         return train_loader, val_loader, test_loader
     else:
         return train_loader, val_loader
+
+
+class LoaderFromPath:
+    def __init__(self, data_path, reshape_mode=None, reshaped_size=640, test_flag=False, store_imgs=False):
+        """
+        gets the data path and loads images or path-to-images split datasets
+
+        args:
+            - data_path: path to dataset
+            - reshape_mode: how to get square imgs
+            - reshaped_size: target size as input to model
+            - test_flag: whether to return the test set (it always split for it, simply it is not returned)
+            - use_label: whether to load also labels
+            - load_imgs: if True it directly loads images to RAM, else it stores paths-to-images
+        """
+        accepted_reshape_types = [None, 'crop', 'grid']
+        assert reshape_mode in accepted_reshape_types, f'{reshape_mode} not valid, chose from {accepted_reshape_types}'
+        self.reshape_mode = reshape_mode
+        self.reshape_size = reshaped_size
+
+        self.data_path = Path(data_path)
+
+        self.store_imgs = store_imgs
+
+        self.test_flag = test_flag
+        self.train, self.val, self.test = self.load_imgs()
+
+    def load_imgs(self):
+        # fare qualcosa per gestire le labels che NON sono ancora reshapate
+
+        imgs = defaultdict(list)
+
+        for folder in os.listdir(self.data_path):
+            # train, valid or test
+
+            my_logger.info(f'loading images from {self.data_path / folder}...')
+            for f in os.listdir(self.data_path / folder):
+                # Normal or Diseased
+                for i in range(len(os.listdir(self.data_path / folder / f))):
+                    # iterating over patients
+                    if self.store_imgs:  # loads all dataset to ram
+                        volume, masks = load_single_volume(self.data_path, f, i)
+                        graph = load_centerline(self.data_path / folder / f / 'Centerlines_graph' / f'{volume.name.replace('ASOCA/','')}_0.5mm.GML')
+                        graph = align_centerline_to_image(volume, graph, 'ijk')
+                        idxs = get_slices_with_centerline(volume)
+
+                        img = np.transpose(volume.data, (2, 0, 1))
+                        img = img[idxs]  # only imgs with centerline in
+
+                        masks = np.transpose(masks, (2, 0, 1))
+                        masks = masks[idxs]
+
+                        imgs[folder].append(self.preprocess((img, masks), graph, idxs))
+
+                    else:  # folders to only load batches
+                         # TO DO
+                        pass
+                my_logger.info(f'loaded {len(imgs[folder])} images for {folder}')
+        if self.test_flag:
+            return imgs['train'], imgs['valid'], imgs['test']
+        else:
+            return imgs['train'], imgs['valid'], []
+
+    def preprocess(self, data, graph, idxs, eps=5, closeness=50.):
+        # TO DO: handle cropping 8build dict)
+
+        imgs, masks = data
+
+        if self.reshape_mode == 'crop':
+            for n_slice in idxs:
+                centroids = get_slice_centroids(n_slice, graph, eps, closeness)
+                # take crops from augmentation
+
+        pass
+
 
 
 
