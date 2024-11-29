@@ -112,13 +112,13 @@ def build_centerline_per_slice_dict(ijkgraph):
     z_dict = {}
 
     for node_id, data in ijkgraph.nodes(data=True):
-        # Floor-round the 'z' value
-        z_floored = math.floor(data['z'])
+        # round the 'z' value to the closest int
+        z_int = floor_or_ceil(data['z'])
 
         # Add the node to the dictionary
-        if z_floored not in z_dict:
-            z_dict[z_floored] = []  # Initialize the list if the key doesn't exist
-        z_dict[z_floored].append(node_id)
+        if z_int not in z_dict:
+            z_dict[z_int] = []  # Initialize the list if the key doesn't exist
+        z_dict[z_int].append(node_id)
 
     return {k: z_dict[k] for k in sorted(z_dict.keys())}
 

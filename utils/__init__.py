@@ -132,3 +132,27 @@ def compute_padding(input_size, target_size, kernel_size, stride):
     else:
         return "No valid padding found for the given input and target size with specified kernel and stride."
 
+
+class RunningStats:
+    def __init__(self):
+        self.n = 0
+        self.mean = 0.0
+        self.var = 0.0
+
+    def __call__(self, *args, **kwargs):
+        self.update(args[0])
+
+    def update(self, vol):
+
+        vol = vol.reshape(-1).tolist()
+        for x in vol:
+            self.n += 1
+            delta = x - self.mean
+            self.mean += delta / self.n
+            delta2 = x - self.mean
+            self.var += delta * delta2
+
+    def get_stats(self):
+        if self.n < 2:
+            return self.mean, float('nan')  # Variance is undefined for n < 2
+        return self.mean, self.var / (self.n - 1)  # Return mean and unbiased variance

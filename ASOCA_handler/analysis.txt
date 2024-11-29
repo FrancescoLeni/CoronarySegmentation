@@ -1,0 +1,41 @@
+mean: -440.9022431091745, var: 269087.0043812561
+max: 3526, min: -1024
+
+
+How many annotations am I cropping out?
+
+a = masks with some non-cropped labels
+b = tot. masks
+c = tot. crops
+d = avg. label' pxls left per mask
+e = avg. label' pxls per mask
+
+
+considering 64x64 crops:
+masks out ratio: 0.274 1550/5650
+crops out ratio: 0.106 1550/14633
+pixels out ratio: 0.070 (15/216)
+
+mean SNR: 0.02 (78/4018)
+std SNR: 0.026
+
+
+considering 128x128 crops:
+masks out ratio: 0.1 (a/b = 566/5650)
+crops out ratio: 0.04 (a/c = 566/14633)
+pixels out ratio: 0.015 (d/e = 3/216)
+
+mean SNR: 0.00575 (93/16291)
+std SNR: 0.00727
+
+
+considering 256x256 crops:
+masks out ratio: 0.04 (a/b = 228/5650)
+crops out ratio: 0.016 (a/c = 228/14633)
+pixels out ratio: 0.0043 (d/e = 1/216)
+
+mean SNR: 0.00193 (126/65409)
+std SNR: 0.00228
+
+
+

@@ -15,7 +15,7 @@ from ..ASOCA_handler.general import load_centerline, load_single_volume, align_c
 
 from ..ASOCA_handler.clustering import get_slice_centroids
 
-from .augmentation import square_crop
+from .augmentation import square_crop, get_grid_patches
 
 
 class DummyLoader(torch.utils.data.Dataset):
@@ -292,7 +292,7 @@ def load_all(img_paths: list, reshape_mode=None, reshaped_size=1024, batch_size=
 
 
 class LoaderFromPath:
-    def __init__(self, data_path, reshape_mode=None, reshaped_size=640, test_flag=False, store_imgs=False):
+    def __init__(self, data_path, reshape_mode=None, crop_size=128, scaler='standard', test_flag=False, store_imgs=False):
         """
         gets the data path and loads images or path-to-images split datasets
 
@@ -300,14 +300,21 @@ class LoaderFromPath:
             - data_path: path to dataset
             - reshape_mode: how to get square imgs
             - reshaped_size: target size as input to model
+            - scaler: the type of scaler for normalizing data
             - test_flag: whether to return the test set (it always split for it, simply it is not returned)
             - use_label: whether to load also labels
             - load_imgs: if True it directly loads images to RAM, else it stores paths-to-images
         """
         accepted_reshape_types = [None, 'crop', 'grid']
-        assert reshape_mode in accepted_reshape_types, f'{reshape_mode} not valid, chose from {accepted_reshape_types}'
+        assert reshape_mode in accepted_reshape_types, f'"""{reshape_mode}" not valid, chose from {accepted_reshape_types}'
         self.reshape_mode = reshape_mode
-        self.reshape_size = reshaped_size
+        self.crop_size = crop_size
+
+        accepted_scalers = ['standard', 'min_max']
+        assert scaler in accepted_scalers, f'"{scaler}" scaler not valid, chose from {accepted_scalers}'
+        self.scaler = scaler
+        self.mean, self.var = (-440.90224, 269087.00438)
+        self.vmax, self.vmin = (3526, -1024)
 
         self.data_path = Path(data_path)
 
@@ -327,25 +334,29 @@ class LoaderFromPath:
             my_logger.info(f'loading images from {self.data_path / folder}...')
             for f in os.listdir(self.data_path / folder):
                 # Normal or Diseased
-                for i in range(len(os.listdir(self.data_path / folder / f))):
+                for i in range(len(os.listdir(self.data_path / folder / f / 'CTCA'))):
                     # iterating over patients
                     if self.store_imgs:  # loads all dataset to ram
                         volume, masks = load_single_volume(self.data_path, f, i)
-                        graph = load_centerline(self.data_path / folder / f / 'Centerlines_graph' / f'{volume.name.replace('ASOCA/','')}_0.5mm.GML')
+
+                        g_name = volume.name.replace('ASOCA/', '')
+                        graph = load_centerline(self.data_path / folder / f / 'Centerlines_graphs' / f'{g_name}_0.5mm.GML')
                         graph = align_centerline_to_image(volume, graph, 'ijk')
-                        idxs = get_slices_with_centerline(volume)
 
-                        img = np.transpose(volume.data, (2, 0, 1))
-                        img = img[idxs]  # only imgs with centerline in
-
+                        # bringing to batch first (BxHxW)
+                        vol = np.transpose(volume.data, (2, 0, 1))
                         masks = np.transpose(masks, (2, 0, 1))
+
+                        # only images with centerline in
+                        idxs = get_slices_with_centerline(graph)
+                        vol = vol[idxs]
                         masks = masks[idxs]
 
-                        imgs[folder].append(self.preprocess((img, masks), graph, idxs))
+                        imgs[folder].extend(self.preprocess((vol, masks), graph, idxs))
 
                     else:  # folders to only load batches
-                         # TO DO
-                        pass
+                        raise AttributeError('TO DO')
+
                 my_logger.info(f'loaded {len(imgs[folder])} images for {folder}')
         if self.test_flag:
             return imgs['train'], imgs['valid'], imgs['test']
@@ -353,18 +364,42 @@ class LoaderFromPath:
             return imgs['train'], imgs['valid'], []
 
     def preprocess(self, data, graph, idxs, eps=5, closeness=50.):
-        # TO DO: handle cropping 8build dict)
 
-        imgs, masks = data
+        vol, masks = data
 
+        # scaling data
+        vol = self.scale_data(vol)
+
+        # cropping around centerline centroids
         if self.reshape_mode == 'crop':
-            for n_slice in idxs:
+            out = []
+            for i, n_slice in enumerate(idxs):
                 centroids = get_slice_centroids(n_slice, graph, eps, closeness)
-                # take crops from augmentation
+                for c in centroids:
+                    v = square_crop(vol[i].squeeze(), self.crop_size, (c[0], c[1]))
+                    m = square_crop(masks[i].squeeze(), self.crop_size, (c[0], c[1]))
+                    out.append((v, m))
+        # cropping in grid-like patches
+        elif self.reshape_mode == 'grid':
+            out = []
+            for i in range(len(idxs)):
+                s_patches = get_grid_patches(self.crop_size, vol[i].squeeze())
+                m_patches = get_grid_patches(self.crop_size, masks[i].squeeze())
+                # using patch ONLY if it contains at least 1 labeled point
+                out += [(s, m) for s, m in zip(s_patches, m_patches) if np.max(m.ravel()) == 1]
+        else:
+            raise AttributeError(f'"{self.reshape_mode}" reshape_mode not valid')
 
-        pass
+        return out
 
-
+    def scale_data(self, x):
+        if self.scaler == 'standard':
+            std = np.sqrt(self.var)
+            return (x - self.mean) / std
+        elif self.scaler == 'min_max':
+            return (x - self.vmin) / (self.vmax - self.vmin)
+        else:
+            raise ValueError(f'provided scaler not valid...')
 
 
 

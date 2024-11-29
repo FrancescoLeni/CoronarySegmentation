@@ -13,13 +13,13 @@ def cluster_centerlines_in_slice(graph, n_slice, eps=5):
             - graph: graph in 'ijk'
             - n_slice: number of current slice
         returns:
-            - cluster_centroids: a np.array with centroids of the clusters of centerline's points
+            - cluster_centroids: a np.array with centroids of the clusters of centerline's points (i, j) coord
     """
     z_dict = build_centerline_per_slice_dict(graph)
 
     xy = np.array([[floor_or_ceil(graph.nodes[i]['x']), floor_or_ceil(graph.nodes[i]['y'])] for i in z_dict[n_slice]])
 
-    db = DBSCAN(eps=eps, min_samples=2).fit(xy)
+    db = DBSCAN(eps=eps, min_samples=1).fit(xy)
 
     # Extract cluster labels (-1 means noise)
     labels = db.labels_
@@ -46,6 +46,10 @@ def get_new_centroids(closest, old_centroids):
     args:
         - closest: a np.array with N pairs of (i,j) coordinates [shape = Nx2]
         - old_centroids: a np.array with old centroids
+
+    returns:
+        - clusters: clustered old centorids
+        - updated_centroids: array with i,j coords of final centroids
     """
 
     clusters = []
@@ -93,7 +97,7 @@ def get_slice_centroids(n_slice, graph, eps=5, closeness=50.):
         - eps: DBSCAN eps (max distance for points inside cluster)
         - closeness: minimum distance between centroids
     returns:
-        - new_centroids: final set of centroids
+        - updated_centroids: final set of centroids (np.array of shape Nc x 2) (i,j coord)
     """
     centroids = cluster_centerlines_in_slice(graph, n_slice, eps)
     distances = np.sqrt(((centroids[:, np.newaxis, :] - centroids[np.newaxis, :, :]) ** 2).sum(axis=2))
@@ -104,11 +108,11 @@ def get_slice_centroids(n_slice, graph, eps=5, closeness=50.):
             if d <= closeness and d != 0.:
                 closest.append((i, j))
     if closest:
-        _, new_centroids = get_new_centroids(np.array(closest), centroids)
+        _, updated_centroids = get_new_centroids(np.array(closest), centroids)
     else:
-        new_centroids = centroids
+        updated_centroids = centroids
 
-    return new_centroids.astype(int)
+    return updated_centroids.astype(int)
 
 
 
