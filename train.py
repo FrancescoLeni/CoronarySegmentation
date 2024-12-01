@@ -1,12 +1,12 @@
 import argparse
 import os
 
-import torch.nn as nn
+import torch
 from pathlib import Path
 
 from models import check_load_model
 from models.common import Dummy, UNet
-from models.Rep_ViT import RepViT
+from models.Rep_ViT import RepViTUnet
 from utils.callbacks import Callbacks, EarlyStopping, Saver
 from utils.loaders import load_all
 from utils.optimizers import get_optimizer, scheduler
@@ -29,6 +29,8 @@ def main(args):
     folder = args.folder
     name = args.name
 
+    data_path = args.data_path
+
     # creating saving location
     p = Path(folder) / 'train'
     os.makedirs(p, exist_ok=True)
@@ -42,28 +44,20 @@ def main(args):
     # saving inputs
     json_from_parser(args, save_path)
 
-    # checking for dataset (ADJUST)
-    # if not args.MMI and not args.Cholect and not args.AtlasDione:
-    #     raise AttributeError('at least one of --MMI, --Cholect, --AtlasDione dataset arguments must be provided...')
-    # else:
-    #     data_paths = [p for p in [args.MMI, args.Cholect, args.AtlasDione] if p is not None]
-    #
-    # assert args.reshape_mode and args.reshape_size, 'both --reshape_size and --reshape_mode are needed together...'
-
     # loading dataset already as iterable torch loaders (train, val ,(optional) test)
-    loaders = load_all(data_paths, args.reshape_mode, args.reshape_size, batch_size, test_flag=False,
-                       n_workers=args.n_workers, pin_memory=args.pin_memory)
+    loaders = load_all(data_path, args.reshape_mode, args.crop_size, batch_size=batch_size, test_flag=False,
+                       scaler=args.scaler, n_workers=args.n_workers, pin_memory=args.pin_memory)
 
     # model (ADJUST)
     if "." not in args.model:
         # means it is not a weight and has to be imported ADJUST => (NEED TO IMPORT IT)
         if args.model == "Dummy":
             model = Dummy()
-        elif args.model == 'UNet':
+        elif args.model == 'Unet':
             model = UNet(out_classes)
             # loading model = bla bla bla
         elif args.model == 'RepViT':
-            model = RepViT('m1', args.reshape_size, fuse=True)
+            model = RepViTUnet('m2', img_size=args.crop_size,  n_classes=out_classes, fuse=True)
         else:
             raise TypeError("Model name not recognised")
     else:
@@ -78,19 +72,22 @@ def main(args):
     saver = Saver(model=mod, save_best=True, save_path=save_path, monitor="val_loss", mode='min')
     callbacks = Callbacks([stopper, saver])
 
-    # if args.weighted_loss:
-    # if args.cropped_seq or args.cropped_seq_raw:
-    #     weights = torch.tensor([0.62963445, 2.42849968], dtype=torch.float32)  # only m9
-    # else:
-    #     weights = None
+    if args.weighted_loss:
+        weights_dict = {64: [0.9812, 0.0188], 128: [0.9944, 0.0056], 256: [0.9981, 0.0019]}
+        weights = torch.tensor(weights_dict[args.crop_size], dtype=torch.float32)
+
+        if torch.cuda.is_available() and args.device == 'gpu':
+            weights = weights.to('cuda:0')
+    else:
+        weights = None
 
     # initializing loss and optimizer
-    loss_fn = SemanticLosses(alpha=1, gamma=2, lambdas=(0.5, 0.5), weight=None)  # maybe consider weights...
+    loss_fn = SemanticLosses(alpha=1, gamma=2, lambdas=(0.5, 0.5), weight=weights)  # maybe consider weights...
 
     opt = get_optimizer(mod, args.opt, args.lr0, momentum=args.momentum, weight_decay=args.weight_decay)
 
     # for encoder only it is just empty, ADJUST for decoder then
-    metrics = Metrics(loss_fn=loss_fn, num_classes=3, device=device, top_k=1, thresh=0.5)
+    metrics = Metrics(loss_fn=loss_fn, num_classes=args.n_class, device=device, top_k=1, thresh=0.5)
 
     # initializing loggers
     logger = Loggers(metrics=metrics, save_path=save_path, opt=opt, test=False)
@@ -110,15 +107,16 @@ if __name__ == "__main__":
 
     # list of arguments (ADJUST for student and SAM)
     parser = argparse.ArgumentParser(description="Parser")
+    parser.add_argument('--model', type=str, required=True, help='name of model to train')
     parser.add_argument('--backbone', type=str, default=None, help='path to backbone weights, if present it ONLY loads weights for it')
 
     # classes (excluding bkg)
-    parser.add_argument('--n_class', type=int, default=3, help='the number of classes to segment (excluding bkg)')
+    parser.add_argument('--n_class', type=int, default=1, help='the number of classes to segment (excluding bkg)')
 
     # reshaping BOTH needed
-    parser.add_argument('--reshape_mode', type=str, default=None, choices=[None, 'crop', 'pad'], help=" how to handle resize")
-    parser.add_argument('--reshape_size', type=int, default=512, help='the finel shape input to model')
-
+    parser.add_argument('--reshape_mode', type=str, default='crop', choices=[None, 'crop', 'pad'], help=" how to handle resize")
+    parser.add_argument('--crop_size', type=int, default=128, help='the finel shape input to model')
+    parser.add_argument('--scaler', type=str, default='standard', choices=['standard', 'min_max'], help='name of the scaler to use')
     parser.add_argument('--epochs', type=int, required=True, help='number of epochs')
     parser.add_argument('--batch_size', type=int, required=True, help='batch size')
     parser.add_argument('--folder', type=str, default="runs", help='name of folder to which saving results')
@@ -133,14 +131,15 @@ if __name__ == "__main__":
     parser.add_argument('--patience', type=int, default=30, help='number of epoch to wait for early stopping')
     parser.add_argument('--device', type=str, default="cpu", choices=["cpu", "gpu"], help='device to which loading the model')
     parser.add_argument('--AMP', action="store_true", help='whether to use AMP')
+
     # probably not userfull
     parser.add_argument('--weighted_loss', action="store_true", help='whether to weight the loss and weight for classes')
 
     # datasets (ADJUST)
-    parser.add_argument('--MMI', type=str, default=None, help='path to MMI dataset')
+    parser.add_argument('--data_path', type=str, default=None, help='path to dataset')
 
     # loaders params
-    parser.add_argument('--n_workers', type=int, default=7, help='number of workers for parallel dataloading ')
+    parser.add_argument('--n_workers', type=int, default=0, help='number of workers for parallel dataloading ')
     parser.add_argument('--pin_memory', type=bool, default=True, help='whether to pin memory for more efficient passage to gpu')
 
     args = parser.parse_args()

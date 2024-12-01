@@ -28,12 +28,10 @@ def floor_or_ceil(value):
         return math.ceil(value)
 
 
-def load_single_volume(path_to_ASOCA, folder, vol_n):
+def load_single_volume(path_to_image):
     """
     args:
-        - path_to_ASOCA: path to ASOCA folder
-        - folder: 'Normal' or 'Diseased'
-        - vol_n: the number relative to the volume to load ([0, 19] becouse 21 images are provided)
+        - path_to_image: path to .nrrd CTCA volume
 
     return:
         - AsocaImageCT obj  (HearticDatasetManager)
@@ -41,15 +39,7 @@ def load_single_volume(path_to_ASOCA, folder, vol_n):
 
     """
 
-    assert vol_n in range(0, 20)
-    assert folder in ['Diseased', 'Normal']
-
-    asoca_graph_file = os.path.join(
-        path_to_ASOCA,
-        DATASET_ASOCA_IMAGES_DICT[folder][vol_n]
-    )
-
-    image = AsocaImageCT(asoca_graph_file)
+    image = AsocaImageCT(path_to_image)
     lab_path = image.path.replace('CTCA', 'Annotations')
     labels, _ = nrrd.read(lab_path)
 

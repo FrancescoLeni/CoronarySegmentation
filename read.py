@@ -2,12 +2,10 @@
 from pathlib import Path
 
 import matplotlib.pyplot as plt
-import numpy as np
 
-from ASOCA_handler.visualize import plot_centerline_over_CT, plot_slice_with_mask_and_centers
-from ASOCA_handler.general import load_centerline, load_single_volume, align_centerline_to_image, floor_or_ceil, \
-                                  build_centerline_per_slice_dict
-from ASOCA_handler.clustering import get_slice_centroids
+from utils.ASOCA_handler.visualize import plot_slice_with_mask_and_centers
+from utils.ASOCA_handler import load_centerline, load_single_volume, align_centerline_to_image
+from utils.ASOCA_handler import get_slice_centroids
 
 
 

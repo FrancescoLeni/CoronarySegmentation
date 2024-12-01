@@ -185,14 +185,14 @@ class SemanticDiceLoss(nn.Module):
         dice = (2 * intersection + self.smooth) / (union + self.smooth)  # [N, C]
 
         # Apply class weights if available
-        if self.weight:
+        if isinstance(self.weight, torch.Tensor):
             weight = self.weight.to(x.device)
             dice = dice * weight  # [N, C]
 
         # Average over classes and batches
-        loss = 1 - torch.mean(dice)
+        loss = 1 - torch.mean(dice[1])  # ONLY foreground
 
-        return loss, dice.mean(dim=0).to('cpu').squeeze().numpy().astype(np.float16)
+        return loss, dice.mean(dim=0).to('cpu').squeeze().detach().numpy().astype(np.float16)[1]  # no bkg
 
 
 class SemanticLosses(nn.Module):
@@ -207,10 +207,6 @@ class SemanticLosses(nn.Module):
             - weight: list of class weights of len == N (num_classes)
         """
         super().__init__()
-
-        if weight:
-            weight = torch.tensor(weight, dtype=torch.float32)
-            weight = weight / torch.sum(weight)   # ensures normalization
 
         self.loss1 = SemanticFocalLoss(alpha, gamma, weight)
         self.loss2 = SemanticDiceLoss(weight)
@@ -233,7 +229,7 @@ class SemanticLosses(nn.Module):
         self.running_dict['loss'] += batch_loss.item()
         self.running_dict['focal_loss'] += focal_loss.item()
         self.running_dict['dice_loss'] += dice_loss.item()
-        if not self.running_dict['dice']:
+        if not isinstance(self.running_dict['dice'], np.ndarray):
             self.running_dict['dice'] = dice
         else:
             self.running_dict['dice'] += dice

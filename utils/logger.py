@@ -107,14 +107,18 @@ class SaveFigures(BaseCallback):
         self.save_metrics()
 
     def save_metrics(self):
-        fig, axes = plt.subplots(nrows=2, ncols=1, figsize=(20, 11))
+        fig, axes = plt.subplots(nrows=2, ncols=4, figsize=(20, 11))
 
-        self.plot_metric("val_loss", axes[0])
-        # self.plot_metric("Accuracy", axes[0, 1])
-        # self.plot_metric("Precision", axes[0, 2])
-        self.plot_metric("train_loss", axes[1])
-        # self.plot_metric("AUC", axes[1, 1])
-        # self.plot_metric("Recall", axes[1, 2])
+        self.plot_metric("val_loss", axes[0, 0])
+        self.plot_metric("train_loss", axes[1, 0])
+
+        self.plot_metric("val_focal_loss", axes[0, 1])
+        self.plot_metric("train_focal_loss", axes[1, 1])
+
+        self.plot_metric("val_dice_loss", axes[0, 2])
+        self.plot_metric("train_dice_loss", axes[1, 2])
+
+        self.plot_metric("dice", axes[0, 3])
 
         fig.tight_layout()
         plt.savefig(self.save_path / self.name, dpi=96)
@@ -123,7 +127,7 @@ class SaveFigures(BaseCallback):
     def plot_metric(self, metric, ax):
         if "loss" not in metric:
             for key in self.logs.dict:
-                if metric in key and "train_" not in key:
+                if metric in key and "train_" not in key and 'loss' not in key:
                     if key[-1].isdigit():
                         lab = key[-1]
                     else:
@@ -356,7 +360,7 @@ class ConfusionMatrixLogger(BaseCallback):
 
 
 class Loggers(BaseCallback):
-    def __init__(self, metrics, opt, save_path, test, wandb):
+    def __init__(self, metrics, opt, save_path, test, wandb=None):
         super().__init__()
         self.logs = LogsHolder(metrics, test=test, wandb=wandb)
         self.csv = SaveCSV(self.logs, save_path, test=test)

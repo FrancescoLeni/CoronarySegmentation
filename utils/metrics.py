@@ -136,11 +136,7 @@ class Metrics(BaseCallback):
 
     def on_train_end(self, num_batches=None):
         for k in self.loss_fn.running_dict.keys():
-            if k == 'dice':
-                self.dict["train_" + k] = [self.loss_fn.running_dict[k][i] / num_batches
-                                           for i in self.loss_fn.running_dict[k].shape[0]]
-            else:
-                self.dict["train_" + k] = [self.loss_fn.running_dict[k] / num_batches]  # all scalars
+            self.dict["train_" + k] = [self.loss_fn.running_dict[k] / num_batches]  # all scalars
 
         for obj in self.metrics:
             name = "train_" + obj.__class__.__name__
@@ -152,11 +148,7 @@ class Metrics(BaseCallback):
 
     def on_val_end(self, num_batches=None, epoch=None):
         for k in self.loss_fn.running_dict.keys():
-            if k == 'dice':
-                self.dict["val_" + k] = [self.loss_fn.running_dict[k][i] / num_batches
-                                         for i in self.loss_fn.running_dict[k].shape[0]]
-            else:
-                self.dict["val_" + k] = [self.loss_fn.running_dict[k] / num_batches]  # all scalars
+            self.dict["val_" + k] = [self.loss_fn.running_dict[k] / num_batches]  # all scalars
 
         for obj in self.metrics:
             name = "val_" + obj.__class__.__name__
