@@ -100,6 +100,9 @@ class ModelClass(nn.Module):
         else:
             self.AMP = False
 
+        total_params = sum(p.numel() for p in self.model.parameters())
+        self.my_logger.info(f"'{self.model.name}' - Total parameters: {total_params}")
+
     def train_one_epoch(self, epoch_index, tot_epochs):
         self.loss_fun.reset()
 
