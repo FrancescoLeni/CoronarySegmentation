@@ -73,7 +73,7 @@ def main(args):
     callbacks = Callbacks([stopper, saver])
 
     if args.weighted_loss:
-        weights_dict = {64: [0.9812, 0.0188], 128: [0.9944, 0.0056], 256: [0.9981, 0.0019]}
+        weights_dict = {64: [0.0188, 0.9812], 128: [0.0056, 0.9944], 256: [0.0019, 0.9981]}
         weights = torch.tensor(weights_dict[args.crop_size], dtype=torch.float32)
 
         if torch.cuda.is_available() and args.device == 'gpu':
