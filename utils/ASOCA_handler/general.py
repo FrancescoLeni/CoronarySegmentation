@@ -2,14 +2,12 @@ import hcatnetwork
 import os
 import nrrd
 import math
+from pathlib import Path
+import numpy as np
 
 from HearticDatasetManager.asoca import AsocaImageCT
 from HearticDatasetManager.asoca.dataset import DATASET_ASOCA_IMAGES_DICT
 from HearticDatasetManager.affine import apply_affine_3d
-
-import matplotlib.pyplot as plt
-import numpy as np
-from sklearn.cluster import DBSCAN
 
 
 def min_max(x):
@@ -40,7 +38,7 @@ def load_single_volume(path_to_image):
     """
 
     image = AsocaImageCT(path_to_image)
-    lab_path = path_to_image.replace('CTCA', 'Annotations')
+    lab_path = str(path_to_image).replace('CTCA', 'Annotations')
     labels, _ = nrrd.read(lab_path)
 
     return image, labels
@@ -116,7 +114,27 @@ def build_centerline_per_slice_dict(ijkgraph):
 def get_slices_with_centerline(ijkgraph):
     z_dict = build_centerline_per_slice_dict(ijkgraph)
 
-    idx = list(z_dict.keys())
+    idx = sorted(list(z_dict.keys()))
 
     return idx
+
+
+def load_vol_lab_graph_and_align(data_path, coord='ijk'):
+    """
+
+    args:
+        - data_path: path to .nrrd vol
+        - coord: 'ijk' or 'RAS'
+    return:
+        - volume, masks, graph
+    """
+
+    data_path = Path(data_path)
+    volume, masks = load_single_volume(data_path)
+    g_name = volume.name.replace('ASOCA/', '')
+    g_path = Path(str(data_path.parent).replace('CTCA', 'Centerlines_graphs'))
+    graph = load_centerline(g_path / f'{g_name}.GML')
+    graph = align_centerline_to_image(volume, graph, coord)
+
+    return volume, masks, graph
 
