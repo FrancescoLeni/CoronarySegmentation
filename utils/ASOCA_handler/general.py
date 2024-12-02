@@ -40,7 +40,7 @@ def load_single_volume(path_to_image):
     """
 
     image = AsocaImageCT(path_to_image)
-    lab_path = image.path.replace('CTCA', 'Annotations')
+    lab_path = path_to_image.replace('CTCA', 'Annotations')
     labels, _ = nrrd.read(lab_path)
 
     return image, labels

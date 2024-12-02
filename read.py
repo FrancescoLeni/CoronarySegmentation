@@ -1,12 +1,20 @@
+import networkx as nx
+import hcatnetwork
+import os
+import nrrd
+import copy
+import math
 
-from pathlib import Path
+from HearticDatasetManager.asoca import AsocaImageCT
+from HearticDatasetManager.asoca.dataset import DATASET_ASOCA_IMAGES_DICT
+from HearticDatasetManager.affine import apply_affine_3d
 
 import matplotlib.pyplot as plt
+import numpy as np
 
-from utils.ASOCA_handler.visualize import plot_slice_with_mask_and_centers
-from utils.ASOCA_handler import load_centerline, load_single_volume, align_centerline_to_image
-from utils.ASOCA_handler import get_slice_centroids
-
+from utils.ASOCA_handler.visualize import plot_centerline_over_CT, plot_slice_with_mask_and_centers
+from utils.ASOCA_handler.general import load_centerline, load_single_volume, align_centerline_to_image, floor_or_ceil, \
+                                        build_centerline_per_slice_dict
 
 
 # MEMO
@@ -114,17 +122,15 @@ from utils.ASOCA_handler import get_slice_centroids
 #     plt.tight_layout()
 #     plt.show()
 
-asoca_path = Path('ASOCA')
 
-f = 'Normal'
-i = 19
-n_slice = 144
+# Path to your .gml file
+file_path = "ASOCA/Diseased/Centerlines_graphs/Diseased_1_0.5mm.GML"
 
-volume, masks = load_single_volume(asoca_path, f, i)
+asoca_path = 'ASOCA'
 
-g_name = volume.name.replace('ASOCA/', '')
-graph = load_centerline(asoca_path / f / 'Centerlines_graphs' / f'{g_name}_0.5mm.GML')
-graph = align_centerline_to_image(volume, graph, 'ijk')
+graph = load_centerline(file_path)
+
+image, labs = load_single_volume(asoca_path, 'Diseased', 0)
 
 # print(image.name)
 # print(image.path)
@@ -133,22 +139,12 @@ graph = align_centerline_to_image(volume, graph, 'ijk')
 # print(image.origin)     # In the RAS coordinate system, this is the origin of the image
 # print(image.spacing)    # Pixel spacing in the x, y and z directions (in mm)
 
-# graph = align_centerline_to_image(image, graph, 'RAS')
+graph = align_centerline_to_image(image, graph, 'RAS')
 
 # whole 3D plot with bound slices
 # plot_centerline_over_CT(image, graph)
 
 # single sclice plot
 # plot_slice_with_mask_and_centers(image, labs, graph, 50)
-
-f, ax = plt.subplots(1, 1)
-
-plot_slice_with_mask_and_centers(volume, masks, graph, n_slice, show=False, ax=ax)
-
-centroids = get_slice_centroids(n_slice, graph)
-
-ax.scatter(centroids[:, 1], centroids[:, 0], c='blue', s=6)
-ax.set_title(f'{g_name}_{n_slice}')
-plt.show()
 
 
