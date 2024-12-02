@@ -124,13 +124,12 @@ from utils.ASOCA_handler.general import load_centerline, load_single_volume, ali
 
 
 # Path to your .gml file
-file_path = "ASOCA/Diseased/Centerlines_graphs/Diseased_1_0.5mm.GML"
+file_path = "ASOCA_DATASET/train/Normal/Centerlines_graphs/Normal_2.GML"
 
 asoca_path = 'ASOCA'
 
 graph = load_centerline(file_path)
 
-image, labs = load_single_volume(asoca_path, 'Diseased', 0)
 
 # print(image.name)
 # print(image.path)
@@ -143,6 +142,8 @@ graph = align_centerline_to_image(image, graph, 'RAS')
 
 # whole 3D plot with bound slices
 # plot_centerline_over_CT(image, graph)
+
+hcatnetwork.draw.draw_centerlines_graph_3d(graph)
 
 # single sclice plot
 # plot_slice_with_mask_and_centers(image, labs, graph, 50)

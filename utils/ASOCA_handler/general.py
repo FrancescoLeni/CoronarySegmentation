@@ -119,12 +119,13 @@ def get_slices_with_centerline(ijkgraph):
     return idx
 
 
-def load_vol_lab_graph_and_align(data_path, coord='ijk'):
+def load_vol_lab_graph_and_align(data_path, coord='ijk', return_data=True):
     """
 
     args:
         - data_path: path to .nrrd vol
         - coord: 'ijk' or 'RAS'
+        - return_data: wheter to return just the np.array of CT vol
     return:
         - volume, masks, graph
     """
@@ -136,5 +137,7 @@ def load_vol_lab_graph_and_align(data_path, coord='ijk'):
     graph = load_centerline(g_path / f'{g_name}.GML')
     graph = align_centerline_to_image(volume, graph, coord)
 
+    if return_data:
+        volume = volume.data
     return volume, masks, graph
 

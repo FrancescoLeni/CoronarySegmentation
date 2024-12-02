@@ -94,19 +94,62 @@ def get_grid_patches(patch_size, image):
     return crops
 
 
-def get_grid_patches_3d(patch_size, depth, image, graph):
-    #  consider to use the least big volume to allow cropping on depht (z_dict indexes + the min)
+def adjust_idxs(vol, idxs, crop_depth):
+    """
+    Adjust both start_id and last_id to make the depth divisible by the crop size,
+    distributing the required padding between the two ends.
+
+    Args:
+        vol: full CT vol (np.array)
+        idxs: indexes of slices with centerline
+        crop_depth (int): crop depth
+
+    Returns:
+        tuple: Adjusted (start_id, last_id).
+    """
+
+    start_id, last_id = idxs[0], idxs[-1]
+
+    max_depth = vol.shape[0]
+    d = vol[start_id:last_id+1].shape[0]
+
+    pad = crop_depth - (d % crop_depth)
+
+    # adds padding only if pad != 0
+    if pad != 0:
+        extra_start = max(0, start_id)  # Max slices we can take from the start
+        extra_end = max(0, max_depth - 1 - last_id)  # Max slices we can add at the end
+
+        pad_start = min(pad // 2, extra_start)  # Take half the padding from the start
+        pad_end = min(pad - pad_start, extra_end)  # Take the remaining from the end
+
+        start_id -= pad_start
+        last_id += pad_end
+
+        # Ensure padding was fully distributed
+        if (pad_start + pad_end) < pad:
+            raise ValueError("Not enough space to adjust start_id and last_id for the required padding.")
+
+    return start_id, last_id
 
 
-    h, w, d = image.shape
+def get_grid_patches_3d(crop_size: tuple, image, idxs):
+
+    patch_size, crop_depth = crop_size
+
+    # check if depth is feasible and adjust if possible
+    start_id, last_id = adjust_idxs(image, idxs, crop_depth)
     crops = []
 
+    d, h, w = image[start_id:last_id+1].shape
     assert not w % patch_size, 'patch size is not suited for image dims'
+
+    sub_vol = image[start_id:last_id+1]
     for y in range(0, h - patch_size + 1, patch_size):
         for x in range(0, w - patch_size + 1, patch_size):
-
-            crop = image[y:y + patch_size, x:x + patch_size]
-            crops.append(crop)
+            for z in range(0, d - crop_depth + 1, crop_depth):
+                crop = sub_vol[z:z + crop_depth, y:y + patch_size, x:x + patch_size]
+                crops.append(crop)
 
     return crops
 

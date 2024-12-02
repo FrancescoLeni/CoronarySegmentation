@@ -50,7 +50,7 @@ def plot_slice_with_mask_and_centers(image, masks, graph_ijk, slice_num, ax=None
     """
         !!!!! NEEDS GRAPH IN IJK COORDINATES !!!!!
     args:
-        - image: AsocaImageCT obj image
+        - image: image as np.array
         - masks: masks np.array (same shape as image.data)
         - graph_ijk: hcatnetwork.graph.SimpleCenterlineGraph graph in "ijk" coord. (IMPORTANT !!!!)
         - slice_num: number of the slice to display. must be between (0, image.shape[3] -1)
@@ -74,7 +74,7 @@ def plot_slice_with_mask_and_centers(image, masks, graph_ijk, slice_num, ax=None
         img = min_max(image)
         lab = masks
     else:
-        img = min_max(image.data[:, :, slice_num])
+        img = min_max(image[:, :, slice_num])
         lab = masks[:, :, slice_num].astype(np.uint8)
 
     img[lab == 1] = 1
@@ -88,3 +88,24 @@ def plot_slice_with_mask_and_centers(image, masks, graph_ijk, slice_num, ax=None
         plt.show()
 
 
+def plot_slice_with_mask(image, masks, slice_num, ax=None, show=True):
+    """
+        !!!!! NEEDS GRAPH IN IJK COORDINATES !!!!!
+    args:
+        - image: image as np.array
+        - masks: masks np.array (same shape as image.data)
+        - slice_num: num of slice to plot
+
+    """
+
+    img = min_max(image[:, :, slice_num])
+    lab = masks[:, :, slice_num].astype(np.uint8)
+
+    img[lab == 1] = 1
+    if not ax:
+        f, ax = plt.subplots(1, 1)
+
+    ax.imshow(img, cmap='gray')
+
+    if show:
+        plt.show()
