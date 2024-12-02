@@ -55,13 +55,3 @@ class BVNet(nn.Module):
         out = self.output_layer(x_d1)
         return out
 
-
-model = BVNet(n_classes=1)
-model = model.to(device)
-
-
-criterion = DiceLoss()
-optimizer = optim.Adam(model.parameters(), lr=1e-4)
-
-# Train the model
-train_model(model, train_loader, val_loader, epochs=50, optimizer=optimizer, criterion=criterion, device=device)

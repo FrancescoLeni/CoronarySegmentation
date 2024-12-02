@@ -8,15 +8,16 @@ import torch
 from . import my_logger
 
 from .ASOCA_handler.general import load_centerline, load_single_volume, align_centerline_to_image, \
-                                    get_slices_with_centerline
+                                    get_slices_with_centerline, floor_or_ceil
 
-from .ASOCA_handler.clustering import get_slice_centroids
+from .ASOCA_handler.clustering import get_slice_centroids, build_centerline_per_slice_dict
 
 from .augmentation import square_crop, get_grid_patches
 
 
 class LoaderFromPath:
-    def __init__(self, data_path, reshape_mode=None, crop_size=128, scaler='standard', test_flag=False, store_imgs=True):
+    def __init__(self, data_path, reshape_mode=None, crop_size=128, scaler='standard', test_flag=False, store_imgs=True,
+                 flag_3D=False):
         """
         gets the data path and loads images or path-to-images split datasets
 
@@ -45,6 +46,7 @@ class LoaderFromPath:
         self.store_imgs = store_imgs
 
         self.test_flag = test_flag
+        self.flag_3D = flag_3D
         self.train, self.val, self.test = self.load_imgs()
 
     def load_imgs(self):
@@ -98,20 +100,39 @@ class LoaderFromPath:
         # cropping around centerline centroids
         if self.reshape_mode == 'crop':
             out = []
-            for i, n_slice in enumerate(idxs):
-                centroids = get_slice_centroids(n_slice, graph, eps, closeness)
-                for c in centroids:
-                    v = square_crop(vol[i].squeeze(), self.crop_size, (c[0], c[1]))
-                    m = square_crop(masks[i].squeeze(), self.crop_size, (c[0], c[1]))
-                    out.append((v, m))
+            if not self.flag_3D:
+                for i, n_slice in enumerate(idxs):
+                    centroids, xy = get_slice_centroids(n_slice, graph, eps, closeness)
+                    for c in centroids:
+                        g_ch = np.zeros(vol[i].shape).astype(np.uint8)
+                        g_ch[xy[:, 1], xy[:, 0]] = 1
+                        g_ch = square_crop(g_ch, self.crop_size, (c[0], c[1]))
+                        v = square_crop(vol[i].squeeze(), self.crop_size, (c[0], c[1]))
+                        m = square_crop(masks[i].squeeze(), self.crop_size, (c[0], c[1]))
+                        v_in = np.stack((v, g_ch), axis=0)
+                        out.append((v_in, m))
+            else:
+                # TO DO
+                pass
+
         # cropping in grid-like patches
         elif self.reshape_mode == 'grid':
             out = []
-            for i in range(len(idxs)):
-                s_patches = get_grid_patches(self.crop_size, vol[i].squeeze())
-                m_patches = get_grid_patches(self.crop_size, masks[i].squeeze())
-                # using patch ONLY if it contains at least 1 labeled point
-                out += [(s, m) for s, m in zip(s_patches, m_patches) if np.max(m.ravel()) == 1]
+            if not self.flag_3D:
+                for i in range(len(idxs)):
+                    z_dict = build_centerline_per_slice_dict(graph)
+                    xy = np.array([[floor_or_ceil(graph.nodes[i]['x']), floor_or_ceil(graph.nodes[i]['y'])] for i in z_dict[n_slice]])
+                    g_ch = np.zeros(vol[i].shape).astype(np.uint8)
+                    g_ch[xy[:, 1], xy[:, 0]] = 1
+                    g_ch = get_grid_patches(self.crop_size, g_ch)
+                    v_patches = get_grid_patches(self.crop_size, vol[i].squeeze())
+                    m_patches = get_grid_patches(self.crop_size, masks[i].squeeze())
+                    # using patch ONLY if it contains at least 1 labeled point
+                    out += [(np.stack((v, g_ch), axis=0), m) for v, m, g in zip(v_patches, m_patches, g_ch) if np.max(m.ravel()) == 1]
+            else:
+                # to do
+                pass
+
         else:
             raise AttributeError(f'"{self.reshape_mode}" reshape_mode not valid')
 

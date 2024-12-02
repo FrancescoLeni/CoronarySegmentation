@@ -27,10 +27,10 @@ def get_left_out_stats(crop_size, data_path=Path('ASOCA'), dst='data/graph', sav
     for f in os.listdir(data_path):
         if os.path.isdir(data_path / f):
             # Normal or Diseased
-            for i in range(len(os.listdir(data_path / f / 'CTCA'))):
+            for i in os.listdir(data_path / f / 'CTCA'):
                 # print(f'{data_path / f / "CTCA" / os.listdir(data_path / f / "CTCA")[i]}')
                 # iterating over patients
-                volume, masks = load_single_volume(data_path, f, i)
+                volume, masks = load_single_volume(data_path / f / 'CTCA' / i)
                 g_name = volume.name.replace('ASOCA/', '')
                 graph = load_centerline(data_path / f / 'Centerlines_graphs' / f'{g_name}{graph_type}.GML')
                 graph = align_centerline_to_image(volume, graph, 'ijk')
@@ -88,15 +88,18 @@ def get_crops_snr(crop_size, data_path=Path('ASOCA'), save=False, dst='data/grap
     tot_ones = 0
     tot_zeros = 0
 
+    dst = Path(dst)
+    graph_type = dst.name.replace('graph', '')
+
     for f in os.listdir(data_path):
         if os.path.isdir(data_path / f):
             # Normal or Diseased
-            for i in range(len(os.listdir(data_path / f / 'CTCA'))):
+            for i in os.listdir(data_path / f / 'CTCA'):
                 # print(f'{data_path / f / "CTCA" / os.listdir(data_path / f / "CTCA")[i]}')
                 # iterating over patients
-                volume, masks = load_single_volume(data_path, f, i)
+                volume, masks = load_single_volume(data_path / f / 'CTCA' / i)
                 g_name = volume.name.replace('ASOCA/', '')
-                graph = load_centerline(data_path / f / 'Centerlines_graphs' / f'{g_name}_0.5mm.GML')
+                graph = load_centerline(data_path / f / 'Centerlines_graphs' / f'{g_name}{graph_type}.GML')
                 graph = align_centerline_to_image(volume, graph, 'ijk')
 
                 # bringing to batch first (BxHxW)

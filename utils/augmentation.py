@@ -93,3 +93,20 @@ def get_grid_patches(patch_size, image):
 
     return crops
 
+
+def get_grid_patches_3d(patch_size, depth, image, graph):
+    #  consider to use the least big volume to allow cropping on depht (z_dict indexes + the min)
+
+
+    h, w, d = image.shape
+    crops = []
+
+    assert not w % patch_size, 'patch size is not suited for image dims'
+    for y in range(0, h - patch_size + 1, patch_size):
+        for x in range(0, w - patch_size + 1, patch_size):
+
+            crop = image[y:y + patch_size, x:x + patch_size]
+            crops.append(crop)
+
+    return crops
+

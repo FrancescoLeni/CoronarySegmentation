@@ -388,6 +388,8 @@ class RepViT(nn.Module):
     def __init__(self, arch, img_size=1024, fuse=False, freeze=False,
                  load_from=None, use_rpn=False, out_indices=['stem', 'stage0', 'stage1', 'final'], upsample_mode='bicubic'):
         super(RepViT, self).__init__()
+
+        self.input_ch = 2  # also graph dim
         # setting of inverted residual blocks
         self.cfgs = self.arch_settings[arch]
         self.img_size = img_size
@@ -398,7 +400,7 @@ class RepViT(nn.Module):
 
         # building first layer
         input_channel = self.cfgs[0][2]
-        patch_embed = torch.nn.Sequential(Conv2d_BN(1, input_channel // 2, 3, 2, 1), torch.nn.GELU(),
+        patch_embed = torch.nn.Sequential(Conv2d_BN(self.input_ch, input_channel // 2, 3, 2, 1), torch.nn.GELU(),
                                           Conv2d_BN(input_channel // 2, input_channel, 3, 2, 1))
         layers = [patch_embed]
         # building inverted residual blocks

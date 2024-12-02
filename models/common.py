@@ -31,7 +31,7 @@ class Dummy(nn.Module):
 class UnetEncoder(nn.Module):
     def __init__(self):
         super().__init__()
-        self.in_ch = 1
+        self.in_ch = 2  # also graph dim
         self.ch_dims = [32, 64, 128, 256, 512]
         self.dropout = [0.05, 0.1, 0.2, 0.3, 0.5]
         assert (len(self.ch_dims) == 5)

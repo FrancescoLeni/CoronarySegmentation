@@ -35,7 +35,7 @@ def cluster_centerlines_in_slice(graph, n_slice, eps=5):
     cluster_centroids = np.array(cluster_centroids)
 
     # centroid of clusters
-    return cluster_centroids
+    return cluster_centroids, xy
 
 
 def get_new_centroids(closest, old_centroids):
@@ -99,9 +99,10 @@ def get_slice_centroids(n_slice, graph, eps=5, closeness=50.):
     returns:
         - updated_centroids: final set of centroids (np.array of shape Nc x 2) (i,j coord)
     """
-    centroids = cluster_centerlines_in_slice(graph, n_slice, eps)
+    centroids, xy = cluster_centerlines_in_slice(graph, n_slice, eps)
     distances = np.sqrt(((centroids[:, np.newaxis, :] - centroids[np.newaxis, :, :]) ** 2).sum(axis=2))
     distances = np.triu(distances)
+
     closest = []
     for i in range(distances.shape[0]):
         for j, d in enumerate(distances[i]):
@@ -112,7 +113,7 @@ def get_slice_centroids(n_slice, graph, eps=5, closeness=50.):
     else:
         updated_centroids = centroids
 
-    return updated_centroids.astype(int)
+    return updated_centroids.astype(int), xy
 
 
 

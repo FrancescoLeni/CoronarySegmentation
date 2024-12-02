@@ -7,6 +7,7 @@ from pathlib import Path
 from models import check_load_model
 from models.common import Dummy, UNet
 from models.Rep_ViT import RepViTUnet
+from models.BVnet_model_prova import BVNet
 from utils.callbacks import Callbacks, EarlyStopping, Saver
 from utils.loaders import load_all
 from utils.optimizers import get_optimizer, scheduler
@@ -58,6 +59,8 @@ def main(args):
             # loading model = bla bla bla
         elif args.model == 'RepViT':
             model = RepViTUnet('m2', img_size=args.crop_size,  n_classes=out_classes, fuse=True)
+        elif args.model == 'BVNet':
+            model = BVNet(out_classes)
         else:
             raise TypeError("Model name not recognised")
     else:
