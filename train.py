@@ -5,9 +5,8 @@ import torch
 from pathlib import Path
 
 from models import check_load_model
-from models.common import Dummy, UNet
+from models.common import Dummy, UNet, UNet3D
 from models.Rep_ViT import RepViTUnet
-from models.BVnet_model_prova import BVNet
 from utils.callbacks import Callbacks, EarlyStopping, Saver
 from utils.loaders import load_all
 from utils.optimizers import get_optimizer, scheduler
@@ -45,10 +44,6 @@ def main(args):
     # saving inputs
     json_from_parser(args, save_path)
 
-    # loading dataset already as iterable torch loaders (train, val ,(optional) test)
-    loaders = load_all(data_path, args.reshape_mode, args.crop_size, batch_size=batch_size, test_flag=False,
-                       scaler=args.scaler, n_workers=args.n_workers, pin_memory=args.pin_memory)
-
     # model (ADJUST)
     if "." not in args.model:
         # means it is not a weight and has to be imported ADJUST => (NEED TO IMPORT IT)
@@ -59,8 +54,8 @@ def main(args):
             # loading model = bla bla bla
         elif args.model == 'RepViT':
             model = RepViTUnet('m2', img_size=args.crop_size,  n_classes=out_classes, fuse=True)
-        elif args.model == 'BVNet':
-            model = BVNet(out_classes)
+        elif args.model == 'Unet3D':
+            model = UNet3D(out_classes)
         else:
             raise TypeError("Model name not recognised")
     else:
@@ -69,6 +64,13 @@ def main(args):
 
     # double-checking whether you parsed weights or model and accounting for transfer learning
     mod = check_load_model(model, args.backbone)
+
+    # check for 3D
+    flag_3d = any(isinstance(module, torch.nn.Conv3d) for module in model.modules())
+
+    # loading dataset already as iterable torch loaders (train, val ,(optional) test)
+    loaders = load_all(data_path, args.reshape_mode, args.crop_size, batch_size=batch_size, test_flag=False,
+                       scaler=args.scaler, n_workers=args.n_workers, pin_memory=args.pin_memory, flag_3D=flag_3d)
 
     # initializing callbacks ( could be handled more concisely i guess...)
     stopper = EarlyStopping(patience=args.patience, monitor="val_loss", mode="min")
@@ -139,7 +141,7 @@ if __name__ == "__main__":
     parser.add_argument('--weighted_loss', action="store_true", help='whether to weight the loss and weight for classes')
 
     # datasets (ADJUST)
-    parser.add_argument('--data_path', type=str, default=None, help='path to dataset')
+    parser.add_argument('--data_path', type=str, default='ASOCA_DATASET', help='path to dataset')
 
     # loaders params
     parser.add_argument('--n_workers', type=int, default=0, help='number of workers for parallel dataloading ')

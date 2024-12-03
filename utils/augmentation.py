@@ -153,3 +153,44 @@ def get_grid_patches_3d(crop_size: tuple, image, idxs):
 
     return crops
 
+
+def square_crop_3d(volume: np.ndarray, crop_size: int, start_id: int, crop_depth: int, center: tuple):
+    """
+    Extracts a square crop from the given image (numpy array). Pads the image if necessary.
+
+    Args:
+        - volume (np.ndarray): Input volume with shape (D, H, W).
+        - crop_size (int): Desired size of the square crop.
+        - start_id: index to start the depth cropping from
+        - crop_depth: slices to include in cropped vol
+        - center (tuple): (i, j) coordinates for the crop center.
+
+    Returns:
+        np.ndarray: Cropped square region of the input image.
+    """
+
+    assert len(volume.shape) < 4, 'Intended only for gray scale volumes'
+
+    d, h, w = volume.shape
+    dx = crop_size // 2
+
+    y, x = center  # row, col are provided
+
+    # Check bounds and calculate required padding
+    top_padding = max(0, dx - y)
+    bottom_padding = max(0, (y + dx) - h)
+    left_padding = max(0, dx - x)
+    right_padding = max(0, (x + dx) - w)
+
+    # Pad the image if necessary
+    if any([top_padding, bottom_padding, left_padding, right_padding]):
+        padding = ((0, 0), (top_padding, bottom_padding), (left_padding, right_padding))
+
+        volume = np.pad(volume, pad_width=padding, mode='constant', constant_values=0)
+        x += left_padding
+        y += top_padding
+
+    crop = volume[start_id:start_id + crop_depth, y - dx:y + dx, x - dx:x + dx]
+
+    return crop
+

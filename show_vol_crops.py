@@ -17,7 +17,7 @@ from utils.ASOCA_handler.visualize import plot_slice_with_mask_and_centers, plot
 from utils.loaders import LoaderFromPath
 
 
-data_path = 'ASOCA_DATASET/train/Normal/CTCA/Normal_2.nrrd'
+data_path = 'ASOCA_DATASET/train/Diseased/CTCA/Diseased_1.nrrd'
 crop_depth = 32
 crop_size = 128
 
@@ -31,7 +31,7 @@ start_id, last_id = adjust_idxs(v, idxs, crop_depth)
 
 clusters_list, kij_list = get_subvolumes_centroid(g, start_id, last_id, crop_depth, closeness=64.)
 
-f, ax = plt.subplots(2, 2)
+f, ax = plt.subplots(2, 4)
 ax = ax.flatten()
 
 c, p = clusters_list[3], kij_list[3]
