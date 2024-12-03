@@ -32,7 +32,9 @@ def main(args):
     data_path = args.data_path
 
     # creating saving location
-    p = Path(folder) / 'train'
+    p = Path('runs') / 'train'
+    if folder:
+        p = p / folder
     os.makedirs(p, exist_ok=True)
     save_path = increment_path(p, name)
     name = save_path.stem
@@ -124,7 +126,7 @@ if __name__ == "__main__":
     parser.add_argument('--scaler', type=str, default='standard', choices=['standard', 'min_max'], help='name of the scaler to use')
     parser.add_argument('--epochs', type=int, required=True, help='number of epochs')
     parser.add_argument('--batch_size', type=int, required=True, help='batch size')
-    parser.add_argument('--folder', type=str, default="runs", help='name of folder to which saving results')
+    parser.add_argument('--folder', type=str, default=None, help='name of folder to which saving results inside runs/train')
     parser.add_argument('--name', type=str, default="exp", help='name of experiment folder inside folder')
     parser.add_argument('--opt', type=str, default="AdamW", choices=["SGD", "Adam", "AdamW"], help='name of optimizer to use')
     parser.add_argument('--sched', type=str, default=None, choices=["linear", "cos_lr"], help="name of the lr scheduler")
@@ -134,7 +136,7 @@ if __name__ == "__main__":
     parser.add_argument('--weight_decay', type=float, default=0.05, help='weight decay value')
     parser.add_argument('--lab_smooth', type=float, default=0, help='label smoothing value')
     parser.add_argument('--patience', type=int, default=30, help='number of epoch to wait for early stopping')
-    parser.add_argument('--device', type=str, default="cpu", choices=["cpu", "gpu"], help='device to which loading the model')
+    parser.add_argument('--device', type=str, default="gpu", choices=["cpu", "gpu"], help='device to which loading the model')
     parser.add_argument('--AMP', action="store_true", help='whether to use AMP')
 
     # probably not userfull

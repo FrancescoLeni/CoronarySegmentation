@@ -190,7 +190,7 @@ class SemanticDiceLoss(nn.Module):
             dice = dice * weight  # [N, C]
 
         # Average over classes and batches
-        loss = 1 - torch.mean(dice[1])  # ONLY foreground
+        loss = 1 - torch.mean(dice)  # [1] to ONLY foreground
 
         return loss, dice.mean(dim=0).to('cpu').squeeze().detach().numpy().astype(np.float16)[1]  # no bkg
 
