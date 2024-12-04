@@ -124,9 +124,13 @@ class SemanticFocalLoss(nn.Module):
             Loss: loss averaged
         """
 
-        ce_loss = F.cross_entropy(x, y, reduction='none', weight=self.weight)  # shape BxHxW
+        ce_loss = F.cross_entropy(x, y, reduction='none')  # shape BxHxW
         pt = torch.exp(-ce_loss)
-        loss = self.alpha * (1 - pt) ** self.gamma * ce_loss  # shape BxHxW
+        if isinstance(self.weight, torch.Tensor):
+            alpha = torch.where(y == 1, self.weight[1], self.weight[0])
+        else:
+            alpha = 1
+        loss = alpha * (1 - pt) ** self.gamma * ce_loss  # shape BxHxW
         self.accumulate(loss.mean())
 
         return loss.mean()
