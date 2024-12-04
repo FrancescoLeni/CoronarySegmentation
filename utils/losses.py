@@ -96,18 +96,44 @@ class MSELoss(nn.Module):
         self.running_dict = {'loss': 0.}
 
 
+class CELoss(nn.Module):
+    def __init__(self, reduction='mean', weights=None):
+        super().__init__()
+        self.loss_fn = nn.CrossEntropyLoss(reduction=reduction, weight=weights)
+
+        self.running_dict = {'loss': 0.}
+
+    def forward(self, x, y):
+        loss = self.loss_fn(x, y)
+        self.accumulate(loss)
+        return loss
+
+    def accumulate(self, batch_loss):
+        self.running_dict['loss'] += batch_loss.item()
+
+    def get_current_value(self, batch_n):
+        n = batch_n + 1  # batch_n is [0, N-1]
+        return self.running_dict['loss'] / n
+
+    def reset(self):
+        self.running_dict = {'loss': 0.}
+
+
+
 class SemanticFocalLoss(nn.Module):
-    def __init__(self, alpha=1, gamma=2, weight=None):
+    def __init__(self, alpha=1, gamma=2, weight=None, gain=1):
         """
             Loss used in RetinaNet for dense detection: https://arxiv.org/abs/1708.02002.
         Args:
             - alpha: Weighting factor in range (0,1). (I think is useless for multiclass)
             - gamma: Exponent of the modulating factor (1 - p_t) to balance easy vs hard examples.
             - weight: torch.Tensor of weights per class (expected normalized)
+            - gain: additional gain (default = 1)
         """
 
         super().__init__()
 
+        self.gain = gain
         self.alpha = alpha
         self.gamma = gamma
 
@@ -128,12 +154,13 @@ class SemanticFocalLoss(nn.Module):
         pt = torch.exp(-ce_loss)
         if isinstance(self.weight, torch.Tensor):
             alpha = torch.where(y == 1, self.weight[1], self.weight[0])
+            alpha = alpha / alpha.mean()
         else:
             alpha = 1
         loss = alpha * (1 - pt) ** self.gamma * ce_loss  # shape BxHxW
         self.accumulate(loss.mean())
 
-        return loss.mean()
+        return self.gain * loss.mean()
 
     def accumulate(self, batch_loss):
         self.running_dict['loss'] += batch_loss.item()
@@ -147,16 +174,18 @@ class SemanticFocalLoss(nn.Module):
 
 
 class SemanticDiceLoss(nn.Module):
-    def __init__(self, weight=None, smooth=1e-6):
+    def __init__(self, weight=None, smooth=1e-6, gain=1):
         """
             Dice Loss for Semantic Segmentation.
 
         Args:
-            weight: torch.Tensor of weights per class (expected normalized)
-            smooth: (float, optional): Smoothing term to avoid division by zero.
+            - weight: torch.Tensor of weights per class (expected normalized)
+            - smooth: (float, optional): Smoothing term to avoid division by zero.
+            - gain: additional gain (default = 1)
         """
         super().__init__()
 
+        self.gain = gain
         self.smooth = smooth
         self.weight = weight  # shape C
 
@@ -196,7 +225,7 @@ class SemanticDiceLoss(nn.Module):
         # Average over classes and batches
         loss = 1 - torch.mean(dice[1])  # [1] to ONLY foreground
 
-        return loss, dice.mean(dim=0).to('cpu').squeeze().detach().numpy().astype(np.float16)[1]  # no bkg
+        return self.gain * loss, dice.mean(dim=0).to('cpu').squeeze().detach().numpy().astype(np.float16)[1]  # no bkg
 
 
 class SemanticLosses(nn.Module):

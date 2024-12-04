@@ -14,18 +14,14 @@ TQDM_BAR_FORMAT = '{l_bar}{bar:10}{r_bar}'
 
 
 def check_load_model(model, backbone_weights):
+
+    assert isinstance(model, nn.Module)
+
     if not backbone_weights:
-        if isinstance(model, nn.Module):
-            return model
-        elif isinstance(model, str) and Path(model).suffix == ".pt" or ".pth":
-            return torch.load(model, map_location=torch.device('cpu'))
-        else:
-            raise TypeError("model not recognised")
+        return model
+
     else:
         # I'm loading only the weights from the backbone
-
-        assert isinstance(model, nn.Module)  # check that the model is something to load weights to
-
         old = torch.load(backbone_weights)
         filtered_state_dict = {k: old.state_dict()[k] for k in old.state_dict() if k in model.state_dict()}
         model.load_state_dict(filtered_state_dict, strict=False)

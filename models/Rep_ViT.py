@@ -452,13 +452,13 @@ class RepViT(nn.Module):
                 state_dict = new_state_dict
             print(self.load_state_dict(state_dict, strict=True))
 
-    def train(self, mode=True):
-        super(RepViT, self).train(mode)
-        if self.freeze:
-            self.features.eval()
-            self.neck.eval()
-            for param in self.parameters():
-                param.requires_grad = False
+    # def train(self, mode=True):
+    #     super(RepViT, self).train(mode)
+    #     if self.freeze:
+    #         self.features.eval()
+    #         self.neck.eval()
+    #         for param in self.parameters():
+    #             param.requires_grad = False
 
     def forward(self, x):
         counter = 0

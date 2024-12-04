@@ -10,7 +10,7 @@ from models.Rep_ViT import RepViTUnet
 from utils.callbacks import Callbacks, EarlyStopping, Saver
 from utils.loaders import load_all
 from utils.optimizers import get_optimizer, scheduler
-from utils.losses import SemanticLosses
+from utils.losses import SemanticLosses, CELoss
 from utils.metrics import Metrics
 from utils.logger import Loggers
 from utils import random_state, increment_path, json_from_parser, my_logger
@@ -91,7 +91,8 @@ def main(args):
         weights = None
 
     # initializing loss and optimizer
-    loss_fn = SemanticLosses(alpha=1, gamma=1.5, lambdas=(0.75, 0.25), weight=weights)  # maybe consider weights...
+    # loss_fn = SemanticLosses(alpha=1, gamma=0.5, lambdas=(0.7, 0.3), weight=weights)
+    loss_fn = CELoss(weights=weights)
 
     opt = get_optimizer(mod, args.opt, args.lr0, momentum=args.momentum, weight_decay=args.weight_decay)
 
