@@ -121,7 +121,7 @@ if __name__ == "__main__":
     parser.add_argument('--n_class', type=int, default=1, help='the number of classes to segment (excluding bkg)')
 
     # reshaping BOTH needed
-    parser.add_argument('--reshape_mode', type=str, default='crop', choices=[None, 'crop', 'pad'], help=" how to handle resize")
+    parser.add_argument('--reshape_mode', type=str, default='crop', choices=[None, 'crop', 'grid'], help=" how to handle resize")
     parser.add_argument('--crop_size', type=int, default=128, help='the finel shape input to model')
     parser.add_argument('--scaler', type=str, default='standard', choices=['standard', 'min_max'], help='name of the scaler to use')
     parser.add_argument('--epochs', type=int, required=True, help='number of epochs')
