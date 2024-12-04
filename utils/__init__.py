@@ -8,6 +8,8 @@ import json
 
 import logging
 
+import torch.nn as nn
+
 
 def init_logger():
 
@@ -156,3 +158,53 @@ class RunningStats:
         if self.n < 2:
             return self.mean, float('nan')  # Variance is undefined for n < 2
         return self.mean, self.var / (self.n - 1)  # Return mean and unbiased variance
+
+
+def calculate_receptive_field(model, input_size=(1, 1, 512, 512)):
+    """
+    Calculates the receptive field of a CNN model.
+
+    Parameters:
+    - model: PyTorch model
+    - input_size: Tuple representing the input dimensions (N, C, H, W)
+
+    Returns:
+    - Receptive field size (in pixels).
+    """
+    # Receptive field tracker
+    receptive_field = 1
+    current_stride = 1
+    current_size = input_size[-1]
+
+    def register_hook(module, input, output):
+        nonlocal receptive_field, current_stride, current_size
+
+        # Only process convolutional, pooling, or transpose layers
+        if isinstance(module, (nn.Conv2d, nn.MaxPool2d, nn.ConvTranspose2d)):
+            kernel_size = module.kernel_size if isinstance(module.kernel_size, tuple) else (module.kernel_size,) * 2
+            stride = module.stride if isinstance(module.stride, tuple) else (module.stride,) * 2
+            padding = module.padding if isinstance(module.padding, tuple) else (module.padding,) * 2
+            dilation = module.dilation if isinstance(module.dilation, tuple) else (module.dilation,) * 2
+
+            # Update receptive field
+            receptive_field += (kernel_size[0] - 1) * current_stride
+            current_stride *= stride[0]
+
+            # Update current spatial size
+            current_size = (current_size - kernel_size[0] + 2 * padding[0]) // stride[0] + 1
+
+    # Register hooks for all layers
+    hooks = []
+    for name, module in model.named_modules():
+        hooks.append(module.register_forward_hook(register_hook))
+
+    # Forward pass to trigger hooks
+    dummy_input = torch.zeros(input_size)
+    model(dummy_input)
+
+    # Remove hooks
+    for hook in hooks:
+        hook.remove()
+
+    return receptive_field
+

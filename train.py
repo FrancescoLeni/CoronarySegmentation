@@ -5,7 +5,7 @@ import torch
 from pathlib import Path
 
 from models import check_load_model
-from models.common import Dummy, UNet, UNet3D
+from models.common import Dummy, UNet, UNet3D, UNetBig
 from models.Rep_ViT import RepViTUnet
 from utils.callbacks import Callbacks, EarlyStopping, Saver
 from utils.loaders import load_all
@@ -53,6 +53,8 @@ def main(args):
             model = Dummy()
         elif args.model == 'Unet':
             model = UNet(out_classes)
+        elif args.model == 'UnetBig':
+            model = UNetBig(n_classes=out_classes)
             # loading model = bla bla bla
         elif args.model == 'RepViT':
             model = RepViTUnet('m2', img_size=args.crop_size,  n_classes=out_classes, fuse=True)
@@ -89,7 +91,7 @@ def main(args):
         weights = None
 
     # initializing loss and optimizer
-    loss_fn = SemanticLosses(alpha=1, gamma=2, lambdas=(0.5, 0.5), weight=weights)  # maybe consider weights...
+    loss_fn = SemanticLosses(alpha=1, gamma=1.5, lambdas=(0.75, 0.25), weight=weights)  # maybe consider weights...
 
     opt = get_optimizer(mod, args.opt, args.lr0, momentum=args.momentum, weight_decay=args.weight_decay)
 
@@ -104,7 +106,8 @@ def main(args):
 
     # building model
     model = ModelClass(mod, loaders, info_log=my_logger, loss_fn=loss_fn, device=device, AMP=args.AMP,
-                       optimizer=opt, metrics=metrics, loggers=logger, callbacks=callbacks, sched=sched)
+                       optimizer=opt, metrics=metrics, loggers=logger, callbacks=callbacks, sched=sched,
+                       grad_clip=args.grad_clip_norm)
 
     # training the model
     model.train_loop(epochs)
@@ -138,6 +141,7 @@ if __name__ == "__main__":
     parser.add_argument('--patience', type=int, default=30, help='number of epoch to wait for early stopping')
     parser.add_argument('--device', type=str, default="gpu", choices=["cpu", "gpu"], help='device to which loading the model')
     parser.add_argument('--AMP', action="store_true", help='whether to use AMP')
+    parser.add_argument('--grad_clip_norm', type=float, default=None)
 
     # probably not userfull
     parser.add_argument('--weighted_loss', action="store_true", help='whether to weight the loss and weight for classes')

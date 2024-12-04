@@ -40,7 +40,7 @@ def check_load_model(model, backbone_weights):
 
 class ModelClass(nn.Module):
     def __init__(self, model, loaders, device='cpu', callbacks=None, loss_fn=None, optimizer=None, sched=None,
-                 metrics=None, loggers=None, AMP=True, freeze=None, info_log=None):
+                 metrics=None, loggers=None, AMP=True, freeze=None, info_log=None, grad_clip=None):
         super().__init__()
         """
         :param
@@ -54,6 +54,7 @@ class ModelClass(nn.Module):
             --sequences: to handle windowed input sequences
         """
 
+        self.grad_clip = grad_clip
         self.freeze = freeze
 
         assert isinstance(info_log, logging.Logger), 'provided info_log is not a logger'
@@ -129,6 +130,11 @@ class ModelClass(nn.Module):
                     loss = self.loss_fun(outputs, labs)
 
                     self.scaler.scale(loss).backward()
+
+                    if self.grad_clip:
+                        self.scaler.unscale_(self.opt)
+                        torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.grad_clip)
+
                     self.scaler.step(self.opt)
                     self.scaler.update()
             else:
@@ -136,6 +142,9 @@ class ModelClass(nn.Module):
 
                 loss = self.loss_fun(outputs, labs)
                 loss.backward()
+
+                if self.grad_clip:
+                    torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.grad_clip)
                 self.opt.step()
 
             del inputs
