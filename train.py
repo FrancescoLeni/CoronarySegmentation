@@ -5,8 +5,8 @@ import torch
 from pathlib import Path
 
 from models import check_load_model
-from models.common import Dummy, UNet, UNet3D, UNetBig
-from models.Rep_ViT import RepViTUnet
+from models.common import Dummy, UNet, UNet3D, UNetBig, ConvNeXtUnet
+from models.Rep_ViT import RepViTUnet, RepViTUnet3D
 from utils.callbacks import Callbacks, EarlyStopping, Saver
 from utils.loaders import load_all
 from utils.optimizers import get_optimizer, scheduler
@@ -61,6 +61,10 @@ def main(args):
             # loading model = bla bla bla
         elif args.model == 'RepViT':
             model = RepViTUnet('m2', img_size=args.crop_size,  n_classes=out_classes, fuse=True)
+        elif args.model == 'ConvNeXt':
+            model = ConvNeXtUnet(n_classes=out_classes)
+        elif args.model == 'RepViT3D':
+            model = RepViTUnet3D(n_classes=out_classes)
         elif args.model == 'Unet3D':
             model = UNet3D(out_classes)
         else:
@@ -94,8 +98,8 @@ def main(args):
         weights = None
 
     # initializing loss and optimizer
-    # loss_fn = SemanticLosses(alpha=1, gamma=0.5, lambdas=(0.8, 0.2), weight=weights)
-    loss_fn = CELoss(weights=weights)
+    loss_fn = SemanticLosses(alpha=1, gamma=1, lambdas=(0.5, 0.5), weight=weights)
+    # loss_fn = CELoss(weights=weights)
 
     opt = get_optimizer(mod, args.opt, args.lr0, momentum=args.momentum, weight_decay=args.weight_decay)
 
@@ -145,7 +149,7 @@ if __name__ == "__main__":
     parser.add_argument('--patience', type=int, default=30, help='number of epoch to wait for early stopping')
     parser.add_argument('--device', type=str, default="gpu", choices=["cpu", "gpu"], help='device to which loading the model')
     parser.add_argument('--AMP', action="store_true", help='whether to use AMP')
-    parser.add_argument('--grad_clip_norm', type=float, default=1.1)
+    parser.add_argument('--grad_clip_norm', type=float, default=1.0)
 
     # probably not userfull (done by default)
     # parser.add_argument('--weighted_loss', action="store_true", help='whether to weight the loss and weight for classes')

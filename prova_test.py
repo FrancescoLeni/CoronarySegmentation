@@ -48,8 +48,9 @@ from utils.augmentation import square_crop
 from models.Rep_ViT import RepViTUnet
 from models import check_load_model
 from copy import deepcopy
+from utils import my_logger
 
-vol, masks, g = load_vol_lab_graph_and_align('ASOCA_DATASET/val/Normal/CTCA/Normal_18.nrrd', 'ijk')
+vol, masks, g = load_vol_lab_graph_and_align('ASOCA_DATASET/test/Diseased/CTCA/Diseased_16.nrrd', 'ijk')
 
 
 idxs = get_slices_with_centerline(g)
@@ -72,7 +73,7 @@ for i, n_slice in enumerate(idxs):
         v_in = np.stack((v, g_ch), axis=0)
         out.append((v, v_in, m, g_ch))
 
-im, input_im, mask, gg = out[12]
+im, input_im, mask, gg = out[24]
 
 def scal(x):
     mean, var = (-440.90224, 269087.00438)
@@ -81,12 +82,12 @@ def scal(x):
 
 mod = RepViTUnet('m2', img_size=128, n_classes=2, fuse=True)
 
-mod = check_load_model(mod, 'runs/train/crop/prova_CE/weights/best_12.pt')
+mod = check_load_model(mod, 'runs/train/crop/crop_unnormalized_focal_alpha/RepViT2D_200epcs_standard/weights/best_32.pt', my_logger)
 
-input_im = torch.tensor(scal(input_im), dtype=torch.float32).unsqueeze(0).repeat(32, 1, 1, 1)
-mod = mod.to('cuda:0')
+input_im = torch.tensor(scal(input_im), dtype=torch.float32).unsqueeze(0)
 
-# mod.eval()
+
+mod.eval()
 #
 # for m in mod.modules():
 #     if isinstance(m, torch.nn.BatchNorm2d):
@@ -94,7 +95,7 @@ mod = mod.to('cuda:0')
 #         m.running_var.fill_(1)
 
 with torch.no_grad():
-    p = mod(input_im.to('cuda:0'))
+    p = mod(input_im)
 
 p = p[0, :, :, :].to('cpu').unsqueeze(0)
 
@@ -104,7 +105,7 @@ class_1prob_t = torch.nn.functional.softmax(p, dim=1)
 # class_1prob = class_1prob[1, :, :].squeeze()
 # If you want the mask for class 1 (mask where class 1 is predicted)
 class_1_mask = (class_1_mask == 1).float().squeeze()  # Convert to a binary mask
-class_1prob = (class_1prob_t.squeeze()[1, :, :].squeeze() > 0.99).float().squeeze()
+class_1prob = class_1prob_t.squeeze()[1, :, :].squeeze()
 # Similarly, you can extract the mask for class 0
 # class_0_mask = (class_1_mask == 0).float().squeeze()
 
@@ -130,13 +131,13 @@ a = a.flatten()
 #         print(f"  Bias (beta): {module.bias.data}")
 
 
-# a[0].imshow(i1, cmap='gray')
-# a[0].set_title('true_mask')
-# a[1].imshow(i2, cmap='gray')
-# a[1].set_title('pred_mask')
-# a[2].imshow(class_1prob)
-# a[2].set_title('probability 1 ')
-# plt.show()
+a[0].imshow(i1, cmap='gray')
+a[0].set_title('true_mask')
+a[1].imshow(i2, cmap='gray')
+a[1].set_title('pred_mask')
+a[2].imshow(class_1prob)
+a[2].set_title('probability 1 ')
+plt.show()
 
 
 

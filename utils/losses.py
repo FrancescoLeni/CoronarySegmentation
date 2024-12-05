@@ -253,8 +253,17 @@ class SemanticLosses(nn.Module):
     def forward(self, x, y):
         focal = self.loss1(x, y)
         dice_loss = self.loss2(x, y)
+        if torch.isnan(focal).any() or torch.isinf(focal).any():
+            print("focal contains NaN or Inf!")
+            raise ValueError("Invalid values in focal.")
+        if torch.isnan(dice_loss).any() or torch.isinf(dice_loss).any():
+            print("dice_loss contains NaN or Inf!")
+            raise ValueError("Invalid values in dice_loss.")
 
         batch_loss = self.lambda1 * focal + self.lambda2 * dice_loss
+        if torch.isnan(batch_loss).any() or torch.isinf(batch_loss).any():
+            print("batch_loss contains NaN or Inf!")
+            raise ValueError("Invalid values in batch_loss.")
 
         self.accumulate(batch_loss, focal, dice_loss)
 

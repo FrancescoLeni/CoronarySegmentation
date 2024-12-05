@@ -5,6 +5,7 @@ import os
 import torch
 import torchmetrics
 import math
+from pathlib import Path
 
 from .callbacks import BaseCallback
 
@@ -14,20 +15,24 @@ class LogsHolder(BaseCallback):
         :param
             --metrics = metrics object
     """
-    def __init__(self, metrics, test=False, wandb=False):
+
+    def __init__(self, metrics, test=False, wandb=False, ignore_class: list = [0]):
         super().__init__()
         self.metrics = metrics
+        self.ignore_class = ignore_class
         self.dict = self.build_metrics_dict()
         self.test = test
         self.wandb = wandb
+
 
     def build_metrics_dict(self):
         d = {key: [] for key in self.metrics.dict}
         dummy = d.copy()
         for key in dummy:
-            if "loss" not in key:
+            if "loss" not in key and 'Dice' not in key:
                 for i in range(self.metrics.num_classes):
-                    d[key+f"_{i}"] = []
+                    if i not in self.ignore_class:
+                        d[key + f"_{i}"] = []
         return d
 
     def on_epoch_end(self, epoch=None):
@@ -37,9 +42,10 @@ class LogsHolder(BaseCallback):
                     self.dict[key].append(self.metrics.dict[key][0])
                 else:
                     for i in range(len(self.metrics.dict[key])):
-                        self.dict[key+f"_{i}"].append(self.metrics.dict[key][i])
+                        if i not in self.ignore_class:
+                            self.dict[key + f"_{i}"].append(self.metrics.dict[key][i])
                     flat = [item for item in self.metrics.dict[key]]
-                    self.dict[key].append(np.float16(sum(flat)/len(flat)))  # mean value
+                    self.dict[key].append(np.float16(sum(flat) / len(flat)))  # mean value
         else:
             for key in self.metrics.dict:
                 if 'train' not in key:
@@ -47,9 +53,9 @@ class LogsHolder(BaseCallback):
                         pass
                     else:
                         for i in range(len(self.metrics.dict[key])):
-                            self.dict[key+f"_{i}"].append(self.metrics.dict[key][i])
+                            self.dict[key + f"_{i}"].append(self.metrics.dict[key][i])
                         flat = [item for item in self.metrics.dict[key]]
-                        self.dict[key].append(np.float16(sum(flat)/len(flat)))  # mean value
+                        self.dict[key].append(np.float16(sum(flat) / len(flat)))  # mean value
 
 
 class SaveCSV(BaseCallback):
@@ -57,6 +63,7 @@ class SaveCSV(BaseCallback):
         :param
             --logs = LogsHolder object
     """
+
     def __init__(self, logs, save_path, name="results.csv", test=False):
         super().__init__()
         self.save_path = save_path
@@ -111,9 +118,11 @@ class SaveFigures(BaseCallback):
         fig, axes, names = self.get_fig_axs(figsize=(20, 11))
         axes = [axes] if not isinstance(axes, (list, np.ndarray)) else axes.flatten()
 
+        best_epoch = self.get_best_epoch()
+
         # handle the plotting with both the losses in one subplot
         for i, n in enumerate(names):
-            self.plot_metric(n, axes[i])
+            self.plot_metric(n, axes[i], best_epoch)
 
         fig.tight_layout()
         plt.savefig(self.save_path / self.name, dpi=96)
@@ -133,7 +142,7 @@ class SaveFigures(BaseCallback):
 
         return f, axs, metrics
 
-    def plot_metric(self, metric, ax):
+    def plot_metric(self, metric, ax, best_epoch):
         if "loss" not in metric:
             for key in self.logs.dict:
                 if metric in key and "train_" not in key and 'loss' not in key:
@@ -146,9 +155,14 @@ class SaveFigures(BaseCallback):
         else:
             # for loss (train and val together)
             for k in ['val_', 'train_']:
-                ax.plot(range(len(self.logs.dict[k+metric])), self.logs.dict[k+metric], label=k+metric)
+                ax.plot(range(len(self.logs.dict[k + metric])), self.logs.dict[k + metric], label=k + metric)
+        ax.axvline(x=best_epoch, color='red', linestyle='--', linewidth=2, label=f'Best epoch: {best_epoch}')
         ax.set_title(metric)
         ax.legend()
+
+    def get_best_epoch(self):
+        b = [int(str(Path(w).stem).replace('best_', '')) for w in os.listdir(self.save_path / 'weights') if 'best' in w]
+        return b[0]
 
 
 class LrLogger(BaseCallback):
@@ -315,10 +329,12 @@ class PRClogger(BaseCallback):
         sep = '\n'
         rows = ['BEST METRICS']
         if self.num_classes != 2:
-            for i, ((P, th_P), (R, th_R)) in enumerate(zip(zip(self.best_P, self.best_P_th), zip(self.best_R, self.best_R_th))):
+            for i, ((P, th_P), (R, th_R)) in enumerate(
+                    zip(zip(self.best_P, self.best_P_th), zip(self.best_R, self.best_R_th))):
                 rows.append(f'class {i}: P = {P :.2f} at {th_P :.2f}; R = {R :.2f} at {th_R :.2f}')
         else:
-            rows.append(f'class {1}: P = {self.best_P[1] :.2f} at {self.best_P_th[1] :.2f}; R = {self.best_R[1] :.2f} at {self.best_R_th[1] :.2f}')
+            rows.append(
+                f'class {1}: P = {self.best_P[1] :.2f} at {self.best_P_th[1] :.2f}; R = {self.best_R[1] :.2f} at {self.best_R_th[1] :.2f}')
 
         return sep.join(rows)
 
@@ -343,7 +359,8 @@ class ConfusionMatrixLogger(BaseCallback):
 
         self.num_classes = num_classes
 
-        self.metric = torchmetrics.classification.ConfusionMatrix(task="multiclass", num_classes=num_classes).to(self.device)
+        self.metric = torchmetrics.classification.ConfusionMatrix(task="multiclass", num_classes=num_classes).to(
+            self.device)
 
         self.cm = None
 
@@ -408,7 +425,6 @@ class Loggers(BaseCallback):
 
 
 def log_confidence_score(indexes, scores, save_path):
-
     scores_np = scores.numpy()
 
     # all together
@@ -426,7 +442,6 @@ def log_confidence_score(indexes, scores, save_path):
 
 
 def save_boxplot(values: list, save_path):
-
     names = [apply_map(l) for l in range(len(values))]
     data = [d for d in values]
 
@@ -463,4 +478,3 @@ def save_scores(scores_np, N, V, S, save_path):
 def save_predictions(pred, save_path):
     pred = pred.numpy()
     np.save(save_path / 'predictions.npy', pred)
-

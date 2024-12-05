@@ -126,19 +126,31 @@ class ModelClass(nn.Module):
 
                     loss = self.loss_fun(outputs, labs)
 
+                    # with torch.autograd.set_detect_anomaly(True):
                     self.scaler.scale(loss).backward()
+
+                    for name, param in self.model.named_parameters():
+                        if param.grad is not None and torch.isnan(param.grad).any():
+                            self.my_logger.info(f"NaN detected in gradients of {name}!")
+                            raise ValueError("NaN in gradients.")
 
                     if self.grad_clip:
                         self.scaler.unscale_(self.opt)
                         torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.grad_clip)
 
-                    self.scaler.step(self.opt)
-                    self.scaler.update()
+                        self.scaler.step(self.opt)
+                        self.scaler.update()
             else:
                 outputs = self.model(inputs)
 
                 loss = self.loss_fun(outputs, labs)
+                # with torch.autograd.set_detect_anomaly(True):
                 loss.backward()
+
+                for name, param in self.model.named_parameters():
+                    if param.grad is not None and torch.isnan(param.grad).any():
+                        print(f"NaN detected in gradients of {name}!")
+                        raise ValueError("NaN in gradients.")
 
                 if self.grad_clip:
                     torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.grad_clip)
@@ -155,18 +167,17 @@ class ModelClass(nn.Module):
                 self.callbacks.on_train_batch_end(outputs.float(), labs, batch)
 
             # updating pbar
-            #     A = self.metrics.A.t_value_mean
-            #     P = self.metrics.P.t_value[1]
-            #     R = self.metrics.R.t_value[1]
-            #     AUC = self.metrics.AuC.t_value[1]
-            #     dice = self.metrics.Dice.t_value
-            #
-            # pbar_loader.set_description(f'Epoch {epoch_index}/{tot_epochs-1}, GPU_mem: {gpu_used:.2f}/{self.gpu_mem:.2f}, '
-            #                             f'train_loss: {current_loss:.4f}, A: {A :.2f}, P: {P :.2f}, R: {R :.2f}, AUC: {AUC :.2f}, '
-            #                             f'Dice: {dice: .2f}')
+                A = self.metrics.A.t_value_mean
+                P = self.metrics.P.t_value[1]
+                R = self.metrics.R.t_value[1]
+                # AUC = self.metrics.AuC.t_value[1]
+                dice = self.metrics.Dice.t_value
 
-            pbar_loader.set_description(f'Epoch {epoch_index}/{tot_epochs - 1}, GPU_mem: {gpu_used:.2f}/{self.gpu_mem:.2f}, '
-                                        f'train_loss: {current_loss:.4f}')
+            pbar_loader.set_description(f'Epoch {epoch_index}/{tot_epochs-1}, GPU_mem: {gpu_used:.2f}/{self.gpu_mem:.2f}, '
+                                        f'train_loss: {current_loss:.4f}, A: {A :.2f}, P: {P :.2f}, R: {R :.2f}, Dice: {dice: .2f}')
+
+            # pbar_loader.set_description(f'Epoch {epoch_index}/{tot_epochs - 1}, GPU_mem: {gpu_used:.2f}/{self.gpu_mem:.2f}, '
+            #                             f'train_loss: {current_loss:.4f}')
             if self.device != "cpu":
                 torch.cuda.synchronize()
 
@@ -215,14 +226,14 @@ class ModelClass(nn.Module):
 
                 # updating pbar
 
-                # A = self.metrics.A.v_value_mean
-                # P = self.metrics.P.v_value[1]
-                # R = self.metrics.R.v_value[1]
+                A = self.metrics.A.v_value_mean
+                P = self.metrics.P.v_value[1]
+                R = self.metrics.R.v_value[1]
                 # AUC = self.metrics.AuC.v_value[1]
-                # dice = self.metrics.Dice.v_value
-                # description = f'Validation: val_loss: {current_loss:.4f}, A: {A :.2f}, ' \
-                #               f'P: {P :.2f}, R: {R :.2f}, AUC: {AUC :.2f}, dice: {dice}'
-                description = f'Validation: val_loss: {current_loss:.4f}'
+                dice = self.metrics.Dice.v_value
+                description = f'Validation: val_loss: {current_loss:.4f}, A: {A :.2f}, ' \
+                              f'P: {P :.2f}, R: {R :.2f}, Dice: {dice :.2f}'
+                # description = f'Validation: val_loss: {current_loss:.4f}'
                 pbar_loader.set_description(description)
 
         if outputs is not None:
