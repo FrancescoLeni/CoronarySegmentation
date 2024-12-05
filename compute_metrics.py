@@ -4,8 +4,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from PIL import Image
 
-from utils.ASOCA_handler import load_centerline, load_single_volume, align_centerline_to_image, get_slices_with_centerline
-from utils.ASOCA_handler import get_slice_centroids
+from utils.ASOCA_handler.general import load_centerline, load_single_volume, align_centerline_to_image, get_slices_with_centerline
+from utils.ASOCA_handler.clustering import get_slice_centroids
 
 from utils.augmentation import square_crop, mask_square
 
@@ -26,38 +26,42 @@ def get_left_out_stats(crop_size, data_path=Path('ASOCA'), dst='data/graph', sav
 
     for f in os.listdir(data_path):
         if os.path.isdir(data_path / f):
-            # Normal or Diseased
-            for i in os.listdir(data_path / f / 'CTCA'):
-                # print(f'{data_path / f / "CTCA" / os.listdir(data_path / f / "CTCA")[i]}')
-                # iterating over patients
-                volume, masks = load_single_volume(data_path / f / 'CTCA' / i)
-                g_name = volume.name.replace('ASOCA/', '')
-                graph = load_centerline(data_path / f / 'Centerlines_graphs' / f'{g_name}{graph_type}.GML')
-                graph = align_centerline_to_image(volume, graph, 'ijk')
+            # 'test', 'train', or 'val'
+            for category in ['Normal', 'Diseased']:  #
+                ctca_path = data_path / f / category / 'CTCA'
+                for i in os.listdir(ctca_path):  
+                    print(f"Processando file {i} nella directory {ctca_path}")
+                    volume, masks = load_single_volume(ctca_path / i)
 
-                # bringing to batch first (BxHxW)
-                masks = np.transpose(masks, (2, 0, 1))
+                    g_name = volume.name.replace('ASOCA/', '')
+                    graph = load_centerline(data_path / f /category / 'Centerlines_graphs' / f'{g_name}{graph_type}.GML')
+                    graph = graph.resample(0.2,True)
+                    graph = align_centerline_to_image(volume, graph, 'ijk')
 
-                # only images with centerline in
-                idxs = get_slices_with_centerline(graph)
-                masks = masks[idxs]
+                    # bringing to batch first (BxHxW)
+                    masks = np.transpose(masks, (2, 0, 1))
 
-                for j, n_slice in enumerate(idxs):
-                    tot_masks += 1
-                    m = masks[j].copy()
-                    masks_pxls += np.sum(m == 1)
-                    centroids = get_slice_centroids(n_slice, graph)
-                    for c in centroids:
-                        tot_crops += 1
-                        masks[j] = mask_square(masks[j], crop_size, (c[0], c[1]))
-                    if np.max(masks[j]) == 1:
-                        count += 1
+                    # only images with centerline in
+                    idxs = get_slices_with_centerline(graph)
+                    masks = masks[idxs]
 
-                        after += np.sum(masks[j] == 1)
+                    for j, n_slice in enumerate(idxs):
+                        tot_masks += 1
+                        m = masks[j].copy()
+                        masks_pxls += np.sum(m == 1)
+                        centroids = get_slice_centroids(n_slice, graph)
+                        
+                        for c in centroids:
+                            tot_crops += 1
+                            masks[j] = mask_square(masks[j], crop_size, c[0])
+                        if np.max(masks[j]) == 1:
+                            count += 1
 
-                        p = (np.sum(masks[j] == 1) / np.sum(m == 1)) * 100
-                        percenteges.append(p)
-                        remaining.append((masks[j], n_slice, g_name))
+                            after += np.sum(masks[j] == 1)
+
+                            p = (np.sum(masks[j] == 1) / np.sum(m == 1)) * 100
+                            percenteges.append(p)
+                            remaining.append((masks[j], n_slice, g_name))
 
     # singles_ratio = f'{after / tot_masks}/{masks_pxls / tot_masks}'
     # ratio = f'{after/masks_pxls}'
@@ -81,6 +85,7 @@ def get_left_out_stats(crop_size, data_path=Path('ASOCA'), dst='data/graph', sav
                 image.save(dst / f'{vol}_{n_slice}.png')
 
 
+
 def get_crops_snr(crop_size, data_path=Path('ASOCA'), save=False, dst='data/graph'):
 
     SNR = []
@@ -91,16 +96,44 @@ def get_crops_snr(crop_size, data_path=Path('ASOCA'), save=False, dst='data/grap
     dst = Path(dst)
     graph_type = dst.name.replace('graph', '')
 
-    for f in os.listdir(data_path):
-        if os.path.isdir(data_path / f):
-            # Normal or Diseased
-            for i in os.listdir(data_path / f / 'CTCA'):
-                # print(f'{data_path / f / "CTCA" / os.listdir(data_path / f / "CTCA")[i]}')
-                # iterating over patients
-                volume, masks = load_single_volume(data_path / f / 'CTCA' / i)
+        # test, train, val
+    for dataset in ['test', 'train', 'val']:
+        # Normal, Diseased
+        for category in ['Normal', 'Diseased']:
+            ctca_path = data_path / dataset / category / 'CTCA'
+            graphs_path = data_path / dataset / category / 'Centerlines_graphs'
+
+        
+            if not ctca_path.exists() or not graphs_path.exists():
+                print(f"Percorso non trovato: {ctca_path} o {graphs_path}")
+                continue
+
+            
+            for i in os.listdir(ctca_path):
+                file_ctca = ctca_path / i
+
+                if not file_ctca.is_file():
+                    print(f"File non trovato o non valido: {file_ctca}")
+                    continue
+
+                print(f"Processando file {i} nella directory {ctca_path}")
+
+                
+                volume, masks = load_single_volume(file_ctca)
+
+                
                 g_name = volume.name.replace('ASOCA/', '')
-                graph = load_centerline(data_path / f / 'Centerlines_graphs' / f'{g_name}{graph_type}.GML')
+                graph_file = graphs_path / f'{g_name}{graph_type}.GML'
+
+                if not graph_file.exists():
+                    print(f"File del grafo non trovato: {graph_file}")
+                    continue
+
+                
+                graph = load_centerline(graph_file)
+                graph = graph.resample(0.2,True)
                 graph = align_centerline_to_image(volume, graph, 'ijk')
+                
 
                 # bringing to batch first (BxHxW)
                 vol = np.transpose(volume.data, (2, 0, 1))
@@ -116,7 +149,7 @@ def get_crops_snr(crop_size, data_path=Path('ASOCA'), save=False, dst='data/grap
                     for c in centroids:
                         tot_crops += 1
 
-                        crop = square_crop(masks[j], crop_size, (c[0], c[1]))
+                        crop = square_crop(masks[j], crop_size, (c[0]))
 
                         tot_ones += np.sum(crop == 1)
                         tot_zeros += np.sum(crop == 0)
@@ -143,8 +176,7 @@ def get_crops_snr(crop_size, data_path=Path('ASOCA'), save=False, dst='data/grap
 
 def get_stats_box(crop_sizes, graph_type, data_path=Path('ASOCA'), dst='data'):
 
-    assert graph_type in ['', '_0.5mm', '_0.5mm_intersections_30deg', '_0.5mm_intersections_35deg',
-                          '_0.5mm_intersections_40deg', '_0.5mm_intersections_60deg']
+    assert graph_type in ['']
 
     dst = Path(dst) / f'graph{graph_type}'
     os.makedirs(dst, exist_ok=True)
@@ -175,9 +207,9 @@ if __name__ == "__main__":
     data_path = Path('ASOCA')
     crop_size = [64, 128, 256]
 
-    graph_type = ['', '_0.5mm_intersections_30deg', '_0.5mm_intersections_35deg',
-                 '_0.5mm_intersections_40deg', '_0.5mm_intersections_60deg']
+    graph_type = ['']
 
     for g in graph_type:
         print(f'computing stats for graph{g}')
         get_stats_box(crop_size, g)
+
