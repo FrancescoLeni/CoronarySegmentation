@@ -9,7 +9,7 @@ from .utility_blocks import LayerNorm, DropPath, SelfAttentionModule, LayerScale
 class CNeXtStem(nn.Module):
     def __init__(self, c1, c2, k=4, s=4, p=0):
         super().__init__()
-        self.conv = nn.Conv2d(c1, c2, k, s, p)
+        self.conv = nn.Conv2d(c1, c2, k, s, p, bias=False)
         self.norm = LayerNorm(c2)
 
     def forward(self, x):
@@ -22,10 +22,10 @@ class CNeXtBlock(nn.Module):  #come paper
         c_ = 4 * dim
         self.act = nn.GELU()
         self.add = shortcut
-        self.dwconv = nn.Conv2d(dim, dim, kernel_size=k, padding=p, groups=dim) # depthwise conv
+        self.dwconv = nn.Conv2d(dim, dim, kernel_size=k, padding=p, groups=dim, bias=False) # depthwise conv
         self.norm = LayerNorm(dim)
-        self.pwconv1 = nn.Conv2d(dim, c_, 1, 1, 0)  # pointwise/1x1 convs, implemented with linear layers
-        self.pwconv2 = nn.Conv2d(c_, dim, 1, 1, 0)
+        self.pwconv1 = nn.Conv2d(dim, c_, 1, 1, 0, bias=False)  # pointwise/1x1 convs, implemented with linear layers
+        self.pwconv2 = nn.Conv2d(c_, dim, 1, 1, 0, bias=False)
         # layer scale
         self.gamma = LayerScale(layer_scale_init_value, dim) if layer_scale_init_value > 0 else None
 
@@ -52,11 +52,43 @@ class CNeXtDownSample(nn.Module):
     def __init__(self, c1, c2, k, s, p):
         super().__init__()
         self.norm = LayerNorm(c1)
-        self.layer = nn.Conv2d(c1, c2, k, s, p)
+        self.conv = nn.Conv2d(c1, c2, k, s, p, bias=False)
 
     def forward(self, x):
-        x = self.layer(self.norm(x))
+        x = self.conv(self.norm(x))
         return x
+
+
+class CNeXtUpSample(nn.Module):
+    def __init__(self, c1, c2, k, s, p):
+        super().__init__()
+        self.norm = LayerNorm(c1)
+        self.norm2 = LayerNorm(c2*2)
+        self.conv = nn.ConvTranspose2d(c1, c2, k, s, p, bias=False)
+        self.pw = nn.Conv2d(c2*2, c2, 1, 1, 0)
+
+    def forward(self, x):
+        x1, x2 = x
+
+        x1 = self.conv(self.norm(x1))
+        x = torch.cat([x1, x2], dim=1)
+
+        return self.pw(self.norm2(x))
+
+
+class UnetUpBlock3D(nn.Module):
+    """ 2x up-sampling"""
+
+    def __init__(self, c1, c2, dropout_p):
+        super().__init__()
+        self.up = nn.ConvTranspose3d(c1, c2, kernel_size=2, stride=2)
+        self.conv = nn.Sequential(nn.Conv3d(c2 * 2, c2, 1),
+                                  UnetBlock3D(c2, c2, dropout_p))
+
+    def forward(self, x1, x2):
+        x1 = self.up(x1)
+        x = torch.cat([x2, x1], dim=1)
+        return self.conv(x)
 
 
 class ConvNormAct(nn.Module):

@@ -4,7 +4,7 @@ import torch.nn as nn
 # import torchvision.transforms as transforms
 
 from .models_blocks import CNeXtBlock, CNeXtStem, CNeXtDownSample, ResBlock, ConvNormAct, ResBlockDP, TransformerBlock, \
-                           SPPF, C3, UnetBlock, UnetDown, UnetUpBlock, UnetBlock3D, UnetDown3D, UnetUpBlock3D
+                           SPPF, C3, UnetBlock, UnetDown, UnetUpBlock, UnetBlock3D, UnetDown3D, UnetUpBlock3D, CNeXtUpSample
 from .utility_blocks import SelfAttentionModule, PatchMerging, PatchExpanding, LayerNorm, SelfAttentionModuleFC, SelfAttentionModuleLin
 
 
@@ -245,3 +245,108 @@ class UNetBig(nn.Module):
         # Final output
         return self.final_conv(x)
 
+
+
+class ConvNeXtEncoder(nn.Module):
+    # ConvNeXt-T: C = (96; 192; 384; 768), B = (3; 3; 9; 3)
+    # ConvNeXt-S: C = (96; 192; 384; 768), B = (3; 3; 27; 3)
+    # ConvNeXt-B: C = (128; 256; 512; 1024), B = (3; 3; 27; 3)
+    # ConvNeXt-L: C = (192; 384; 768; 1536), B = (3; 3; 27; 3)
+    # ConvNeXt-XL: C = (256; 512; 1024; 2048), B = (3; 3; 27; 3)
+    def __init__(self, model_type='T', drop_path=0., layer_scale_init_value=1e-6):
+        super().__init__()
+
+        if model_type == 'T':
+            self.B = [3, 3, 9, 3]
+            self.C = [96, 192, 384, 768]
+        else:
+            self.B = [3, 3, 27, 3]
+
+        if model_type == 'S':
+            self.C = [96, 192, 384, 768]
+        elif model_type == 'B':
+            self.C = [128, 385, 768, 1024]
+        elif model_type == 'L':
+            self.C = [192, 384, 768, 1536]
+        elif model_type == 'XL':
+            self.C = [256, 512, 1024, 2048]
+
+        self.stem = CNeXtStem(2, self.C[0], k=2, s=2)
+
+        self.S = nn.ModuleList([nn.Sequential(*(CNeXtBlock(self.C[i], drop_path=drop_path, layer_scale_init_value=layer_scale_init_value)
+                                                for _ in range(self.B[i]))) for i in range(4)])
+        self.DownSample = nn.ModuleList([CNeXtDownSample(self.C[i], self.C[i+1], 2, 2, 0) for i in range(3)])
+
+
+    def forward(self, x):
+
+        x = self.stem(x)  # /4 - 96
+        x0 = self.S[0](x)
+
+        x = self.DownSample[0](x0)  # /2 - 192
+        x1 = self.S[1](x)
+
+        x = self.DownSample[1](x1)  # /2 - 384
+        x2 = self.S[2](x)
+
+        x = self.DownSample[2](x2)  # /2 - 768
+        x = self.S[3](x)
+
+        return x, x2, x1, x0
+
+
+class ConvNeXtDecoder(nn.Module):
+    def __init__(self, n_classes=2, model_type='T', drop_path=0., layer_scale_init_value=1e-6):
+        super().__init__()
+
+        if model_type == 'T':
+            self.B = [3, 3, 3, 3]
+            self.C = list(reversed([96, 192, 384, 768]))
+        else:
+            self.B = list(reversed([3, 3, 27, 3]))
+
+        if model_type == 'S':
+            self.C = list(reversed([96, 192, 384, 768]))
+        elif model_type == 'B':
+            self.C = list(reversed([128, 385, 768, 1024]))
+        elif model_type == 'L':
+            self.C = list(reversed([192, 384, 768, 1536]))
+        elif model_type == 'XL':
+            self.C = list(reversed([256, 512, 1024, 2048]))
+
+
+        self.S = nn.ModuleList([nn.Sequential(*(CNeXtBlock(self.C[i], drop_path=drop_path, layer_scale_init_value=layer_scale_init_value)
+                                                for _ in range(self.B[i]))) for i in range(1,4,1)])
+        self.Up = nn.ModuleList([CNeXtUpSample(self.C[i], self.C[i+1], 2, 2, 0) for i in range(0,3,1)])
+
+        self.head = nn.Sequential(LayerNorm(self.C[-1]),
+                                  nn.ConvTranspose2d(self.C[-1], self.C[-1]//4, 2, 2, 0, bias=False),
+                                  CNeXtBlock(self.C[-1]//4, drop_path=drop_path, layer_scale_init_value=layer_scale_init_value),
+                                  nn.Conv2d(self.C[-1]//4, n_classes, kernel_size=1))
+
+    def forward(self, x):
+        x, x2, x1, x0 = x
+
+        x = self.Up[0]((x, x2))  # 2x - 384
+        x = self.S[0](x)
+
+        x = self.Up[1]((x, x1))  # 2x - 192
+        x = self.S[1](x)
+
+        x = self.Up[2]((x, x0))  # 2x - 96
+        x = self.S[2](x)
+
+        return self.head(x)
+
+
+class ConvNeXtUnet(nn.Module):
+    def __init__(self, n_classes=2, model_type='T', drop_path=0., layer_scale_init_value=1e-6):
+        super().__init__()
+
+        self.name = 'ConvNeXtUnet'
+
+        self.encoder = ConvNeXtEncoder(model_type, drop_path, layer_scale_init_value)
+        self.decoder = ConvNeXtDecoder(n_classes, model_type, drop_path, layer_scale_init_value)
+
+    def forward(self, x):
+        return self.decoder(self.encoder(x))

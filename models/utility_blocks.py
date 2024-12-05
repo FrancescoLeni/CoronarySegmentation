@@ -10,9 +10,9 @@ class LayerNorm(nn.Module):
         self.norm = nn.LayerNorm(normalized_shape, eps, elementwise_affine=True)
 
     def forward(self, x):
-        x = x.permute(0, 2, 1)  # (N, C, L) -> (N, L, C)
+        x = x.permute(0, 2, 3, 1)  # (N, C, H, W) -> (N, H, W, C)
         x = self.norm(x)
-        x = x.permute(0, 2, 1)  # (N, L, C) -> (N, C, L)
+        x = x.permute(0, 3, 1, 2)  # (N, H, W, C) -> (N, C, H, W)
         return x
 
 
@@ -48,9 +48,9 @@ class LayerScale(nn.Module):
                                   requires_grad=True)
 
     def forward(self, x):
-        x = x.permute(0, 2, 1)  # (N, C, L) -> (N, L, C)
+        x = x.permute(0, 2, 3, 1)  # (N, C, H, W) -> (N, H, W, C)
         x = self.gamma * x
-        x = x.permute(0, 2, 1)  # (N, L, C) -> (N, C, L)
+        x = x.permute(0, 3, 1, 2)  # (N, H, W, C) -> (N, C, H, W)
         return x
 
 
@@ -190,3 +190,55 @@ class SelfAttentionModuleLin(nn.Module):
         scale = self.act(x_)
 
         return x * scale
+
+
+import torch.nn as nn
+import torch.nn.functional as F
+
+def make_divisible(v, divisor, round_limit=0.9):
+    """Utility function to ensure channels are divisible."""
+    new_v = max(divisor, int(v + divisor / 2) // divisor * divisor)
+    # Make sure that rounding does not go down by more than round_limit.
+    if new_v < round_limit * v:
+        new_v += divisor
+    return new_v
+
+def create_act_layer(act_layer, inplace=True):
+    """Utility to create activation layers."""
+    if isinstance(act_layer, str):
+        if act_layer.lower() == 'relu':
+            return nn.ReLU(inplace=inplace)
+        elif act_layer.lower() == 'sigmoid':
+            return nn.Sigmoid()
+        elif act_layer.lower() == 'tanh':
+            return nn.Tanh()
+        else:
+            raise ValueError(f"Unsupported activation: {act_layer}")
+    return act_layer(inplace=inplace)
+
+
+class SE3D(nn.Module):
+    """ SE Module adapted for 3D convolutions. """
+    def __init__(
+            self, channels, rd_ratio=1. / 16, rd_channels=None, rd_divisor=8, add_maxpool=False,
+            bias=True, act_layer=nn.ReLU, norm_layer=None, gate_layer='sigmoid'):
+        super(SE3D, self).__init__()
+        self.add_maxpool = add_maxpool
+        if not rd_channels:
+            rd_channels = make_divisible(channels * rd_ratio, rd_divisor, round_limit=0.)
+        self.fc1 = nn.Conv3d(channels, rd_channels, kernel_size=1, bias=bias)
+        self.bn = norm_layer(rd_channels) if norm_layer else nn.Identity()
+        self.act = create_act_layer(act_layer, inplace=True)
+        self.fc2 = nn.Conv3d(rd_channels, channels, kernel_size=1, bias=bias)
+        self.gate = create_act_layer(gate_layer)
+
+    def forward(self, x):
+        # Global average pooling (over spatial dimensions: D, H, W)
+        x_se = x.mean((2, 3, 4), keepdim=True)
+        if self.add_maxpool:
+            # Experimental: Combine max pooling with average pooling
+            x_se = 0.5 * x_se + 0.5 * x.amax((2, 3, 4), keepdim=True)
+        x_se = self.fc1(x_se)
+        x_se = self.act(self.bn(x_se))
+        x_se = self.fc2(x_se)
+        return x * self.gate(x_se)
