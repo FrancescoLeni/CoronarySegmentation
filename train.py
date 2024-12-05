@@ -29,6 +29,9 @@ def main(args):
     folder = args.folder
     name = args.name
 
+    # weighted_loss = args.weighted_loss
+    weighted_loss = True
+
     data_path = args.data_path
 
     # creating saving location
@@ -67,7 +70,7 @@ def main(args):
         model = args.model
 
     # double-checking whether you parsed weights or model and accounting for transfer learning
-    mod = check_load_model(model, args.backbone)
+    mod = check_load_model(model, args.backbone, my_logger)
 
     # check for 3D
     flag_3d = any(isinstance(module, torch.nn.Conv3d) for module in model.modules())
@@ -81,7 +84,7 @@ def main(args):
     saver = Saver(model=mod, save_best=True, save_path=save_path, monitor="val_loss", mode='min')
     callbacks = Callbacks([stopper, saver])
 
-    if args.weighted_loss:
+    if weighted_loss:
         weights_dict = {64: [0.0188, 0.9812], 128: [0.0056, 0.9944], 256: [0.0019, 0.9981]}
         weights = torch.tensor(weights_dict[args.crop_size], dtype=torch.float32)
 
@@ -91,7 +94,7 @@ def main(args):
         weights = None
 
     # initializing loss and optimizer
-    # loss_fn = SemanticLosses(alpha=1, gamma=0.5, lambdas=(0.7, 0.3), weight=weights)
+    # loss_fn = SemanticLosses(alpha=1, gamma=0.5, lambdas=(0.8, 0.2), weight=weights)
     loss_fn = CELoss(weights=weights)
 
     opt = get_optimizer(mod, args.opt, args.lr0, momentum=args.momentum, weight_decay=args.weight_decay)
@@ -142,10 +145,10 @@ if __name__ == "__main__":
     parser.add_argument('--patience', type=int, default=30, help='number of epoch to wait for early stopping')
     parser.add_argument('--device', type=str, default="gpu", choices=["cpu", "gpu"], help='device to which loading the model')
     parser.add_argument('--AMP', action="store_true", help='whether to use AMP')
-    parser.add_argument('--grad_clip_norm', type=float, default=None)
+    parser.add_argument('--grad_clip_norm', type=float, default=1.1)
 
-    # probably not userfull
-    parser.add_argument('--weighted_loss', action="store_true", help='whether to weight the loss and weight for classes')
+    # probably not userfull (done by default)
+    # parser.add_argument('--weighted_loss', action="store_true", help='whether to weight the loss and weight for classes')
 
     # datasets (ADJUST)
     parser.add_argument('--data_path', type=str, default='ASOCA_DATASET', help='path to dataset')
