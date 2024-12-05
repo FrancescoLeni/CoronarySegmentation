@@ -108,7 +108,7 @@ class Dice(BaseMetric):
     def __init__(self, num_classes=2, device="gpu", top_k=1):
         super().__init__(num_classes, device)
 
-        self.metric = torchmetrics.classification.Dice(num_classes=2, top_k=top_k, ignore_index=0)
+        self.metric = torchmetrics.classification.Dice(num_classes=2, top_k=top_k, ignore_index=0).to(self.device)
 
 class AUC(BaseMetric):
     """
@@ -132,12 +132,13 @@ class Metrics(BaseCallback):
 
         """
 
-        self.A = Accuracy(num_classes=num_classes, device=device, top_k=top_k, thresh=thresh)
-        self.P = Precision(num_classes=num_classes, device=device, top_k=top_k, thresh=thresh)
-        self.R = Recall(num_classes=num_classes, device=device, top_k=top_k, thresh=thresh)
-        self.AuC = AUC(num_classes=num_classes, device=device, thresh=None)
-        self.Dice = Dice(num_classes=num_classes, device=device)
-        self.metrics = [self.A, self.P, self.R, self.AuC, self.Dice]
+        # self.A = Accuracy(num_classes=num_classes, device=device, top_k=top_k, thresh=thresh)
+        # self.P = Precision(num_classes=num_classes, device=device, top_k=top_k, thresh=thresh)
+        # self.R = Recall(num_classes=num_classes, device=device, top_k=top_k, thresh=thresh)
+        # self.AuC = AUC(num_classes=num_classes, device=device, thresh=None)
+        # self.Dice = Dice(num_classes=num_classes, device=device)
+        # self.metrics = [self.A, self.P, self.R, self.AuC, self.Dice]
+        self.metrics = []
         self.loss_fn = loss_fn
         self.dict = self.build_metrics_dict()
         self.num_classes = num_classes

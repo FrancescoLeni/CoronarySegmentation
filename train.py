@@ -100,7 +100,7 @@ def main(args):
     opt = get_optimizer(mod, args.opt, args.lr0, momentum=args.momentum, weight_decay=args.weight_decay)
 
     # for encoder only it is just empty, ADJUST for decoder then
-    metrics = Metrics(loss_fn=loss_fn, num_classes=args.n_class, device=device, top_k=1, thresh=0.5)
+    metrics = Metrics(loss_fn=loss_fn, num_classes=out_classes, device=device, top_k=1, thresh=0.5)
 
     # initializing loggers
     logger = Loggers(metrics=metrics, save_path=save_path, opt=opt, test=False)

@@ -121,7 +121,7 @@ class CELoss(nn.Module):
 
 
 class SemanticFocalLoss(nn.Module):
-    def __init__(self, alpha=1, gamma=2, weight=None, gain=1):
+    def __init__(self, alpha=1, gamma=2, weight=None, gain=1.):
         """
             Loss used in RetinaNet for dense detection: https://arxiv.org/abs/1708.02002.
         Args:
@@ -174,7 +174,7 @@ class SemanticFocalLoss(nn.Module):
 
 
 class SemanticDiceLoss(nn.Module):
-    def __init__(self, weight=None, smooth=1e-6, gain=1):
+    def __init__(self, weight=None, smooth=1e-6, gain=1.):
         """
             Dice Loss for Semantic Segmentation.
 
@@ -225,7 +225,7 @@ class SemanticDiceLoss(nn.Module):
         # Average over classes and batches
         loss = 1 - torch.mean(dice[1])  # [1] to ONLY foreground
 
-        return self.gain * loss, dice.mean(dim=0).to('cpu').squeeze().detach().numpy().astype(np.float16)[1]  # no bkg
+        return self.gain * loss    # dice.mean(dim=0).to('cpu').squeeze().detach().numpy().astype(np.float16)[1]  # no bkg
 
 
 class SemanticLosses(nn.Module):
@@ -243,31 +243,31 @@ class SemanticLosses(nn.Module):
 
         assert sum([*lambdas]) == 1, 'not normalized lambdas'
 
-        self.loss1 = SemanticFocalLoss(alpha, gamma, weight)
-        self.loss2 = SemanticDiceLoss(weight)
+        self.loss1 = SemanticFocalLoss(alpha, gamma, weight, gain=1)
+        self.loss2 = SemanticDiceLoss(weight, gain=0.85)
 
         self.lambda1, self.lambda2 = lambdas
 
-        self.running_dict = {'loss': 0., 'focal_loss': 0., 'dice_loss': 0., 'dice': None}
+        self.running_dict = {'loss': 0., 'focal_loss': 0., 'dice_loss': 0.}
 
     def forward(self, x, y):
         focal = self.loss1(x, y)
-        dice_loss, dice = self.loss2(x, y)
+        dice_loss = self.loss2(x, y)
 
         batch_loss = self.lambda1 * focal + self.lambda2 * dice_loss
 
-        self.accumulate(batch_loss, focal, dice_loss, dice)
+        self.accumulate(batch_loss, focal, dice_loss)
 
         return batch_loss
 
-    def accumulate(self, batch_loss, focal_loss, dice_loss, dice):
+    def accumulate(self, batch_loss, focal_loss, dice_loss):
         self.running_dict['loss'] += batch_loss.item()
         self.running_dict['focal_loss'] += focal_loss.item()
         self.running_dict['dice_loss'] += dice_loss.item()
-        if not isinstance(self.running_dict['dice'], np.ndarray):
-            self.running_dict['dice'] = dice
-        else:
-            self.running_dict['dice'] += dice
+        # if not isinstance(self.running_dict['dice'], np.ndarray):
+        #     self.running_dict['dice'] = dice
+        # else:
+        #     self.running_dict['dice'] += dice
 
     def get_current_value(self, batch_n, only_loss=True):
         n = batch_n + 1  # batch_n is [0, N-1]
@@ -278,7 +278,7 @@ class SemanticLosses(nn.Module):
             return {self.running_dict[k] / n for k in self.running_dict.keys()}
 
     def reset(self):
-        self.running_dict = {'loss': 0., 'focal_loss': 0., 'dice_loss': 0., 'dice': None}
+        self.running_dict = {'loss': 0., 'focal_loss': 0., 'dice_loss': 0.}
 
 
 class DistillationLoss(nn.Module):

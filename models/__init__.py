@@ -13,7 +13,7 @@ import logging
 TQDM_BAR_FORMAT = '{l_bar}{bar:10}{r_bar}'
 
 
-def check_load_model(model, backbone_weights):
+def check_load_model(model, backbone_weights, my_logger):
 
     assert isinstance(model, nn.Module)
 
@@ -21,6 +21,7 @@ def check_load_model(model, backbone_weights):
         return model
 
     else:
+        my_logger.info(f'loading pretrained weights from {backbone_weights}')
         # I'm loading only the weights from the backbone
         old = torch.load(backbone_weights)
         filtered_state_dict = {k: old.state_dict()[k] for k in old.state_dict() if k in model.state_dict()}
@@ -154,19 +155,15 @@ class ModelClass(nn.Module):
                 self.callbacks.on_train_batch_end(outputs.float(), labs, batch)
 
             # updating pbar
-            # if self.metrics.num_classes != 2:
-            #     A = self.metrics.A.t_value_mean
-            #     P = self.metrics.P.t_value_mean
-            #     R = self.metrics.R.t_value_mean
-            #     AUC = self.metrics.AuC.t_value_mean
-            # else:
             #     A = self.metrics.A.t_value_mean
             #     P = self.metrics.P.t_value[1]
             #     R = self.metrics.R.t_value[1]
             #     AUC = self.metrics.AuC.t_value[1]
-
+            #     dice = self.metrics.Dice.t_value
+            #
             # pbar_loader.set_description(f'Epoch {epoch_index}/{tot_epochs-1}, GPU_mem: {gpu_used:.2f}/{self.gpu_mem:.2f}, '
-            #                             f'train_loss: {last_loss:.4f}, A: {A :.2f}, P: {P :.2f}, R: {R :.2f}, AUC: {AUC :.2f}')
+            #                             f'train_loss: {current_loss:.4f}, A: {A :.2f}, P: {P :.2f}, R: {R :.2f}, AUC: {AUC :.2f}, '
+            #                             f'Dice: {dice: .2f}')
 
             pbar_loader.set_description(f'Epoch {epoch_index}/{tot_epochs - 1}, GPU_mem: {gpu_used:.2f}/{self.gpu_mem:.2f}, '
                                         f'train_loss: {current_loss:.4f}')
@@ -216,19 +213,15 @@ class ModelClass(nn.Module):
                 # updating roc and prc
                 self.loggers.on_val_batch_end(outputs, labels, batch)
 
-                # # updating pbar
-                # if self.metrics.num_classes != 2:
-                #     A = self.metrics.A.v_value_mean
-                #     P = self.metrics.P.v_value_mean
-                #     R = self.metrics.R.v_value_mean
-                #     AUC = self.metrics.AuC.v_value_mean
-                # else:
-                #     A = self.metrics.A.v_value_mean
-                #     P = self.metrics.P.v_value[1]
-                #     R = self.metrics.R.v_value[1]
-                #     AUC = self.metrics.AuC.v_value[1]
-                # description = f'Validation: val_loss: {last_loss:.4f}, val_A: {A :.2f}, ' \
-                #               f'val_P: {P :.2f}, val_R: {R :.2f}, val_AUC: {AUC :.2f}'
+                # updating pbar
+
+                # A = self.metrics.A.v_value_mean
+                # P = self.metrics.P.v_value[1]
+                # R = self.metrics.R.v_value[1]
+                # AUC = self.metrics.AuC.v_value[1]
+                # dice = self.metrics.Dice.v_value
+                # description = f'Validation: val_loss: {current_loss:.4f}, A: {A :.2f}, ' \
+                #               f'P: {P :.2f}, R: {R :.2f}, AUC: {AUC :.2f}, dice: {dice}'
                 description = f'Validation: val_loss: {current_loss:.4f}'
                 pbar_loader.set_description(description)
 

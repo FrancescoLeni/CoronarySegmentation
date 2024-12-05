@@ -8,7 +8,7 @@ def get_optimizer(model, name, lr0, momentum=None, weight_decay=None):
     params_no_wd = []
     params_with_wd = []
     for n, param in model.named_parameters():
-        if 'bn' in n:  # Assuming BatchNorm layers' names contain 'bn'
+        if 'bn' in n or 'norm' in n:  # Assuming BatchNorm layers' names contain 'bn'
             params_no_wd.append(param)
         else:
             params_with_wd.append(param)
