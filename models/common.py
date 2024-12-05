@@ -38,13 +38,13 @@ class UnetEncoder(nn.Module):
         self.stem = UnetBlock(
             self.in_ch, self.ch_dims[0], self.dropout[0])
         self.down1 = UnetDown(
-            self.ch_dims[0], self.ch_dims[1], self.dropout[1])
+            self.ch_dims[0], self.ch_dims[1], self.dropout[0])
         self.down2 = UnetDown(
-            self.ch_dims[1], self.ch_dims[2], self.dropout[2])
+            self.ch_dims[1], self.ch_dims[2], self.dropout[0])
         self.down3 = UnetDown(
-            self.ch_dims[2], self.ch_dims[3], self.dropout[3])
+            self.ch_dims[2], self.ch_dims[3], self.dropout[0])
         self.down4 = UnetDown(
-            self.ch_dims[3], self.ch_dims[4], self.dropout[4])
+            self.ch_dims[3], self.ch_dims[4], self.dropout[0])
 
     def forward(self, x):     # ->  128x128x1
         x0 = self.stem(x)     # ->  128x128x32
@@ -109,13 +109,13 @@ class UnetEncoder3D(nn.Module):
         self.stem = UnetBlock3D(
             self.in_ch, self.ch_dims[0], self.dropout[0])
         self.down1 = UnetDown3D(
-            self.ch_dims[0], self.ch_dims[1], self.dropout[1])
+            self.ch_dims[0], self.ch_dims[1], self.dropout[0])
         self.down2 = UnetDown3D(
-            self.ch_dims[1], self.ch_dims[2], self.dropout[2])
+            self.ch_dims[1], self.ch_dims[2], self.dropout[0])
         self.down3 = UnetDown3D(
-            self.ch_dims[2], self.ch_dims[3], self.dropout[3])
+            self.ch_dims[2], self.ch_dims[3], self.dropout[0])
         self.down4 = UnetDown3D(
-            self.ch_dims[3], self.ch_dims[4], self.dropout[4])
+            self.ch_dims[3], self.ch_dims[4], self.dropout[0])
 
     def forward(self, x):     # ->  128x128x1
         x0 = self.stem(x)     # ->  128x128x32
