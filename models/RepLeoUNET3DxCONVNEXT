@@ -1,0 +1,88 @@
+import torch
+import torch.nn as nn
+
+class ConvNeXtBlock3D(nn.Module):
+    def __init__(self, in_channels, dropout_rate=0.1):
+        super().__init__()
+        self.depthwise_conv = nn.Conv3d(in_channels, in_channels, kernel_size=7, padding=3, groups=in_channels)
+        self.norm = nn.LayerNorm([in_channels, 1, 1, 1])
+        self.pointwise_conv1 = nn.Conv3d(in_channels, 4 * in_channels, kernel_size=1)
+        self.gelu = nn.GELU()
+        self.pointwise_conv2 = nn.Conv3d(4 * in_channels, in_channels, kernel_size=1)
+        self.dropout = nn.Dropout(dropout_rate)
+
+    def forward(self, x):
+        residual = x
+        x = self.depthwise_conv(x)
+        x = x.permute(0, 2, 3, 4, 1)  # Change to (batch, depth, height, width, channels) for LayerNorm
+        x = self.norm(x)
+        x = x.permute(0, 4, 1, 2, 3)  # Back to (batch, channels, depth, height, width)
+        x = self.pointwise_conv1(x)
+        x = self.gelu(x)
+        x = self.pointwise_conv2(x)
+        x = self.dropout(x)
+        return x + residual
+
+class UNet3D(nn.Module):
+    def __init__(self, in_channels, out_channels, features=[32, 64, 128, 256]):
+        super().__init__()
+        self.encoder = nn.ModuleList()
+        self.decoder = nn.ModuleList()
+        self.pool = nn.MaxPool3d(kernel_size=2, stride=2)
+
+        # Encoder
+        for feature in features:
+            self.encoder.append(self._conv_block(in_channels, feature))
+            in_channels = feature
+
+        # Bottleneck
+        self.bottleneck = self._conv_block(features[-1], features[-1] * 2)
+
+        # Decoder
+        for feature in reversed(features):
+            self.decoder.append(
+                nn.ConvTranspose3d(feature * 2, feature, kernel_size=2, stride=2)
+            )
+            self.decoder.append(self._conv_block(feature * 2, feature))
+
+        # Output
+        self.final_conv = nn.Conv3d(features[0], out_channels, kernel_size=1)
+
+    def forward(self, x):
+        skip_connections = []
+
+        # Encoder
+        for layer in self.encoder:
+            x = layer(x)
+            skip_connections.append(x)
+            x = self.pool(x)
+
+        # Bottleneck
+        x = self.bottleneck(x)
+
+        # Decoder
+        skip_connections = skip_connections[::-1]
+        for idx in range(0, len(self.decoder), 2):
+            x = self.decoder[idx](x)
+            skip_connection = skip_connections[idx // 2]
+            if x.shape != skip_connection.shape:
+                x = nn.functional.interpolate(x, size=skip_connection.shape[2:])
+            x = torch.cat((skip_connection, x), dim=1)
+            x = self.decoder[idx + 1](x)
+
+        # Output
+        return self.final_conv(x)
+
+    def _conv_block(self, in_channels, out_channels):
+        return nn.Sequential(
+            ConvNeXtBlock3D(in_channels),
+            nn.Conv3d(in_channels, out_channels, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+        )
+
+# Test the model
+#if __name__ == "__main__":
+    #model = UNet3D(in_channels=1, out_channels=2)
+    #x = torch.randn(1, 1, 64, 64, 64)  # Example input
+    #output = model(x)
+    #print(output.shape)
