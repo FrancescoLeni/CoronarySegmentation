@@ -130,10 +130,16 @@ a = a.flatten()
 #         print(f"  Bias (beta): {module.bias.data}")
 
 
-a[0].imshow(i1, cmap='gray')
-a[0].set_title('true_mask')
-a[1].imshow(i2, cmap='gray')
-a[1].set_title('pred_mask')
-a[2].imshow(class_1prob)
-a[2].set_title('probability 1 ')
-plt.show()
+# a[0].imshow(i1, cmap='gray')
+# a[0].set_title('true_mask')
+# a[1].imshow(i2, cmap='gray')
+# a[1].set_title('pred_mask')
+# a[2].imshow(class_1prob)
+# a[2].set_title('probability 1 ')
+# plt.show()
+
+
+
+
+
+

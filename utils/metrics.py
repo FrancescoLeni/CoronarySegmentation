@@ -97,6 +97,18 @@ class Recall(BaseMetric):
         self.metric = torchmetrics.classification.Recall(task="multiclass", num_classes=num_classes,
                                                              top_k=top_k, average=None).to(self.device)
 
+class Dice(BaseMetric):
+    """
+    :param
+        --num_classes: number of classes
+        --device: device "cpu" or "gpu"
+        --top_k: Number of highest probability or logit score predictions considered to find the correct label.
+        --thresh: Threshold for transforming probability to binary {0,1} predictions (ONLY if binary)
+    """
+    def __init__(self, num_classes=2, device="gpu", top_k=1):
+        super().__init__(num_classes, device)
+
+        self.metric = torchmetrics.classification.Dice(num_classes=2, top_k=top_k, ignore_index=0)
 
 class AUC(BaseMetric):
     """
@@ -120,13 +132,13 @@ class Metrics(BaseCallback):
 
         """
 
-        # self.A = Accuracy(num_classes=num_classes, device=device, top_k=top_k, thresh=thresh)
-        # self.P = Precision(num_classes=num_classes, device=device, top_k=top_k, thresh=thresh)
-        # self.R = Recall(num_classes=num_classes, device=device, top_k=top_k, thresh=thresh)
-        # self.AuC = AUC(num_classes=num_classes, device=device, thresh=None)
-        # self.metrics = [self.A, self.P, self.R, self.AuC]
+        self.A = Accuracy(num_classes=num_classes, device=device, top_k=top_k, thresh=thresh)
+        self.P = Precision(num_classes=num_classes, device=device, top_k=top_k, thresh=thresh)
+        self.R = Recall(num_classes=num_classes, device=device, top_k=top_k, thresh=thresh)
+        self.AuC = AUC(num_classes=num_classes, device=device, thresh=None)
+        self.Dice = Dice(num_classes=num_classes, device=device)
+        self.metrics = [self.A, self.P, self.R, self.AuC, self.Dice]
         self.loss_fn = loss_fn
-        self.metrics = []
         self.dict = self.build_metrics_dict()
         self.num_classes = num_classes
 

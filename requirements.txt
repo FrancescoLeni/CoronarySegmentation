@@ -13,6 +13,4 @@ torchmetrics
 timm
 pynrrd
 
-git+https://github.com/AAMIASoftwares-research/DatasetUtilities.git
-git+https://github.com/AAMIASoftwares-research/HCATNetwork.git
 

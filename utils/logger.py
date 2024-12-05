@@ -4,6 +4,7 @@ from matplotlib import pyplot as plt
 import os
 import torch
 import torchmetrics
+import math
 
 from .callbacks import BaseCallback
 
@@ -107,7 +108,10 @@ class SaveFigures(BaseCallback):
         self.save_metrics()
 
     def save_metrics(self):
-        fig, axes = plt.subplots(nrows=2, ncols=4, figsize=(20, 11))
+        fig, axes, names = self.get_fig_axs(figsize=(20, 11))
+        axes = axes.flatten()
+
+        # handle the plotting with both the losses in one subplot
 
         self.plot_metric("val_loss", axes[0, 0])
         self.plot_metric("train_loss", axes[1, 0])
@@ -123,6 +127,19 @@ class SaveFigures(BaseCallback):
         fig.tight_layout()
         plt.savefig(self.save_path / self.name, dpi=96)
         plt.close()
+
+    def get_fig_axs(self, figsize=(20, 11)):
+
+        df = pd.read_csv(self.save_path / 'results.csv')
+        num_metrics = len([x for x in df.keys() if ('val_' in x and 'loss_' in x) or 'loss_' not in x])
+
+        # Calculate the number of columns and rows
+        cols = math.ceil(math.sqrt(num_metrics) * 1.5)  # Increase columns for rectangle
+        rows = math.ceil(num_metrics / cols)  # Rows as a function of columns
+
+        f, axs = plt.subplots(rows, cols, figsize=figsize)
+
+        return f, axs, num_metrics
 
     def plot_metric(self, metric, ax):
         if "loss" not in metric:
