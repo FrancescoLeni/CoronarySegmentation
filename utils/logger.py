@@ -109,7 +109,7 @@ class SaveFigures(BaseCallback):
 
     def save_metrics(self):
         fig, axes, names = self.get_fig_axs(figsize=(20, 11))
-        axes = axes.flatten()
+        axes = [axes] if not isinstance(axes, (list, np.ndarray)) else axes.flatten()
 
         # handle the plotting with both the losses in one subplot
         for i, n in enumerate(names):
@@ -126,7 +126,7 @@ class SaveFigures(BaseCallback):
         num_metrics = len(metrics)
 
         # Calculate the number of columns and rows
-        cols = math.ceil(math.sqrt(num_metrics) * 1.5)  # Increase columns for rectangle
+        cols = math.floor(math.sqrt(num_metrics) * 1.5)  # Increase columns for rectangle
         rows = math.ceil(num_metrics / cols)  # Rows as a function of columns
 
         f, axs = plt.subplots(rows, cols, figsize=figsize)
