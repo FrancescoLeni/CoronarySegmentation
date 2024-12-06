@@ -3,6 +3,7 @@ import numpy as np
 import torch.nn.functional as F
 import torch
 import torch.nn as nn
+from models.common import UNet
 
 from utils.loaders import LoaderFromPath
 
@@ -80,9 +81,9 @@ def scal(x):
     std = np.sqrt(var)
     return (x - mean) / std
 
-mod = RepViTUnet('m2', img_size=128, n_classes=2, fuse=True)
+mod = UNet(2)
 
-mod = check_load_model(mod, 'runs/train/crop/crop_unnormalized_focal_alpha/RepViT2D_200epcs_standard/weights/best_32.pt', my_logger)
+mod = check_load_model(mod, 'runs/best_0.pt', my_logger)
 
 input_im = torch.tensor(scal(input_im), dtype=torch.float32).unsqueeze(0)
 

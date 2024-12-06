@@ -54,8 +54,12 @@ class LoaderFromPath:
         imgs = defaultdict(list)
 
         for folder in os.listdir(self.data_path):
-            # train, valid or test
+            # train, valid
             if not self.test_flag and folder == 'test':
+                continue
+
+            # only test
+            if self.test_flag and folder != 'test':
                 continue
 
             my_logger.info(f'loading images from {self.data_path / folder}...')
@@ -86,7 +90,7 @@ class LoaderFromPath:
             x, _ = imgs[folder][0]
             my_logger.info(f'loaded {len(imgs[folder])} samples with shape {x.shape} for "{folder}"')
         if self.test_flag:
-            return imgs['train'], imgs['val'], imgs['test']
+            return [], [], imgs['test']
         else:
             return imgs['train'], imgs['val'], []
 
@@ -221,7 +225,7 @@ class LoaderFromData(torch.utils.data.Dataset):
         return x, y
 
 
-def load_all(data_path, reshape_mode=None, crop_size=128, scaler='standard', batch_size=4, test_flag=False, n_workers=7,
+def load_all(data_path, reshape_mode=None, crop_size=128, scaler='standard', batch_size=4, test_flag=False, n_workers=0,
              pin_memory=True, flag_3D=False):
     """
         loads all data in img_paths and returns the dataloaders for train, val and eventually test
@@ -253,14 +257,13 @@ def load_all(data_path, reshape_mode=None, crop_size=128, scaler='standard', bat
     val += loader.val
     test += loader.test
 
-
-    train_loader = torch.utils.data.DataLoader(LoaderFromData(train), batch_size=batch_size, shuffle=True,
-                                               pin_memory=pin_memory, num_workers=n_workers)
-    val_loader = torch.utils.data.DataLoader(LoaderFromData(val), batch_size=batch_size, shuffle=True,
-                                             pin_memory=pin_memory, num_workers=n_workers)
     if test_flag:
         test_loader = torch.utils.data.DataLoader(LoaderFromData(test), batch_size=batch_size, shuffle=False,
                                                   pin_memory=pin_memory, num_workers=n_workers)
-        return train_loader, val_loader, test_loader
+        return test_loader
     else:
+        train_loader = torch.utils.data.DataLoader(LoaderFromData(train), batch_size=batch_size, shuffle=True,
+                                                   pin_memory=pin_memory, num_workers=n_workers)
+        val_loader = torch.utils.data.DataLoader(LoaderFromData(val), batch_size=batch_size, shuffle=True,
+                                                 pin_memory=pin_memory, num_workers=n_workers)
         return train_loader, val_loader

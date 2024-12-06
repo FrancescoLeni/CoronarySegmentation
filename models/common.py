@@ -325,6 +325,7 @@ class ConvNeXtDecoder(nn.Module):
         self.head = nn.Sequential(LayerNorm(self.C[-1]),
                                   nn.ConvTranspose2d(self.C[-1], self.C[-1]//4, 2, 2, 0, bias=False),
                                   CNeXtBlock(self.C[-1]//4, drop_path=drop_path, layer_scale_init_value=layer_scale_init_value),
+                                  LayerNorm(self.C[-1]//4),
                                   nn.Conv2d(self.C[-1]//4, n_classes, kernel_size=1))
 
     def forward(self, x):

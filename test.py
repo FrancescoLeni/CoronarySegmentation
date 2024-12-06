@@ -1,0 +1,181 @@
+from utils.loaders import load_all
+import argparse
+import torch
+from pathlib import Path
+import torchmetrics
+import os
+import matplotlib.pyplot as plt
+import pandas as pd
+import numpy as np
+import random
+
+from models.common import Dummy, UNet, UNet3D, UNetBig, ConvNeXtUnet
+from models.Rep_ViT import RepViTUnet, RepViTUnet3D
+from models import check_load_model
+
+from utils import my_logger
+
+def compute_all_metrics(data, device, metrics_dict, num_classes=2):
+
+    x, y = data
+
+    P = torchmetrics.classification.Precision(task="multiclass", num_classes=num_classes, top_k=1, average=None).to(device)
+    R = torchmetrics.classification.Recall(task="multiclass", num_classes=num_classes, top_k=1, average=None).to(device)
+    A = torchmetrics.classification.Accuracy(task="multiclass", num_classes=num_classes, top_k=1, average=None).to(device)
+
+    # in-place
+    metrics_dict['Precision'].append(P(x, y)[1].item())
+    metrics_dict['Recall'].append(R(x, y)[1].item())
+    metrics_dict['Accuracy'].append(A(x, y)[1].item())
+
+
+
+def main(args):
+
+    dst = Path(str(Path(args.weights).parent).replace('train', 'test') + f'_{Path(args.weights).stem}')
+    os.makedirs(dst, exist_ok=True)
+    print(f'save path is "{dst}')
+
+
+    if torch.cuda.is_available():
+        device = torch.device('cuda')
+    else:
+        device = torch.device('cpu')
+
+    print(f'used device: {device}')
+
+
+    out_classes = args.n_classes
+
+    if args.model == "Dummy":
+        model = Dummy()
+    elif args.model == 'Unet':
+        model = UNet(out_classes)
+    elif args.model == 'UnetBig':
+        model = UNetBig(n_classes=out_classes)
+        # loading model = bla bla bla
+    elif args.model == 'RepViT':
+        model = RepViTUnet('m2', img_size=args.crop_size, n_classes=out_classes, fuse=True)
+    elif args.model == 'ConvNeXt':
+        model = ConvNeXtUnet(n_classes=out_classes)
+    elif args.model == 'RepViT3D':
+        model = RepViTUnet3D(n_classes=out_classes)
+    elif args.model == 'Unet3D':
+        model = UNet3D(out_classes)
+    else:
+        raise TypeError("Model name not recognised")
+
+    model = check_load_model(model, args.weights, my_logger)
+    model.to(device)
+
+    flag3D = any(isinstance(module, torch.nn.Conv3d) for module in model.modules())
+
+    test_loader = load_all(args.data_path, reshape_mode=args.reshape_mode, crop_size=args.crop_size, scaler='standard',
+                           batch_size=args.batch_size, test_flag=True, flag_3D=flag3D)
+
+    out = []
+    # model.eval()
+    metrics_dict = {'Dice': [], 'Precision': [], 'Recall': [], 'Accuracy': []}
+
+    dice = torchmetrics.classification.Dice(num_classes=out_classes, top_k=1, ignore_index=0).to(device)
+
+    np_batches = []
+
+    print('evaluating on loaded testset...')
+    with torch.no_grad():
+        for n, batch in enumerate(test_loader):
+            print(f' batch {n+1}/{len(test_loader)}')
+            x, y = batch
+
+            p = model(x.to(device))
+
+            pred = torch.argmax(p, dim=1)
+            pred = (pred == 1).float().squeeze()
+            prob = torch.nn.functional.softmax(p, dim=1)
+
+
+            # i[0] to only get channel img, p[1] to only select class 1 probs
+            np_batches += [(i[0].cpu().numpy().squeeze(), j.cpu().numpy().squeeze(),
+                               pb[1].cpu().numpy().squeeze(), pr.cpu().numpy().squeeze())
+                              for i, j, pb, pr in zip(x, y, prob, pred)]
+
+            metrics_dict['Dice'].append(dice(p, y))
+            dice.reset()
+
+            out.append((p, y.to(device)))
+
+    preds = torch.cat([x for x, _ in out], dim=0)
+    masks = torch.cat([y for _, y in out], dim=0)
+
+    compute_all_metrics((preds, masks), device, metrics_dict)
+
+    # saving boxplot to dst
+    f, a = plt.subplots(1,1, figsize=(14.4, 10.8))
+    a.boxplot(metrics_dict['Dice'], label='Dice')
+    a.set_title(f'Test set Dice for {args.model}')
+    plt.savefig(dst / 'test_dice.png', dpi=100)
+    plt.close()
+    print('Dice boxplot saved!')
+
+    metrics_dict['Dice'] = [np.mean(metrics_dict['Dice'])]
+
+    # saving metrics test
+    df = pd.DataFrame(metrics_dict)
+    df.to_csv(dst / 'test_metrics.csv', index=False)
+    print('CSV saved!')
+
+    # plotting 4 random crops
+    random.shuffle(np_batches)
+    sampled = np_batches[:4]
+
+
+    for n, s in enumerate(sampled):
+        im, mask, prob, pred = s
+
+        if flag3D:
+            i = random.randint(0, len(im)-1)
+            im, mask, prob, pred = im[i], mask[i], prob[i], pred[i]
+
+        f, axs = plt.subplots(1, 3, figsize=(14.4, 10.8))
+        axs = axs.flatten()
+
+        overlay_gt= np.zeros((mask.shape[0], mask.shape[1], 3))
+        overlay_gt[:, :, 0] = mask
+
+        axs[0].imshow(im, cmap='gray')
+        axs[0].imshow(overlay_gt, cmap='Reds', alpha=0.5)
+        axs[0].axis('off')
+        axs[0].set_title('true mask')
+
+        overlay_pred = np.zeros((pred.shape[0], pred.shape[1], 3))
+        overlay_pred[:, :, 0] = pred
+
+        axs[1].imshow(im, cmap='gray')
+        axs[1].imshow(overlay_pred, cmap='Reds', alpha=0.5)
+        axs[1].axis('off')
+        axs[1].set_title('predicted mask')
+
+        axs[2].imshow(prob, cmap='jet')
+        axs[2].axis('off')
+        axs[2].set_title('prediction probability')
+
+        plt.tight_layout()
+        plt.savefig(dst / f'test_exemple_{n}.png', dpi=100)
+        plt.close()
+    print('Random crop saved!')
+
+if __name__ == '__main__':
+    # do things
+
+    parser = argparse.ArgumentParser(description="Parser")
+    parser.add_argument('--model', type=str, required=True, help='name of model to train')
+    parser.add_argument('--weights', type=str, required=True, help='path to weights')
+    parser.add_argument('--data_path', type=str, default='ASOCA_DATASET', help='path to ASOCA dataset')
+    parser.add_argument('--n_classes', type=int, default=2, help='number of classes')
+    parser.add_argument('--reshape_mode', type=str, default='crop', choices=['crop', 'grid'], help=" how to handle resize")
+    parser.add_argument('--crop_size', type=int, default=128, help='the finel shape input to model')
+    parser.add_argument('--batch_size', type=int, default=32, help='batch size')
+
+    args = parser.parse_args()
+
+    main(args)

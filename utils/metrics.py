@@ -109,7 +109,7 @@ class Dice(BaseMetric):
     def __init__(self, num_classes=2, device="gpu", top_k=1):
         super().__init__(num_classes, device)
 
-        self.metric = torchmetrics.classification.Dice(num_classes=2, top_k=top_k, ignore_index=0).to(self.device)
+        self.metric = torchmetrics.classification.Dice(num_classes=num_classes, top_k=top_k, ignore_index=0).to(self.device)
 
 
 class AUC(BaseMetric):
