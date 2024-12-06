@@ -246,14 +246,13 @@ class UNetBig(nn.Module):
         return self.final_conv(x)
 
 
-
 class ConvNeXtEncoder(nn.Module):
     # ConvNeXt-T: C = (96; 192; 384; 768), B = (3; 3; 9; 3)
     # ConvNeXt-S: C = (96; 192; 384; 768), B = (3; 3; 27; 3)
     # ConvNeXt-B: C = (128; 256; 512; 1024), B = (3; 3; 27; 3)
     # ConvNeXt-L: C = (192; 384; 768; 1536), B = (3; 3; 27; 3)
     # ConvNeXt-XL: C = (256; 512; 1024; 2048), B = (3; 3; 27; 3)
-    def __init__(self, model_type='T', drop_path=0., layer_scale_init_value=1e-6):
+    def __init__(self, model_type='T', drop_path=0.1, layer_scale_init_value=1e-6):
         super().__init__()
 
         if model_type == 'T':
@@ -273,6 +272,7 @@ class ConvNeXtEncoder(nn.Module):
 
         self.stem = CNeXtStem(2, self.C[0], k=2, s=2)
 
+        self.norm = nn.ModuleList([LayerNorm(self.C[i]) for i in range(3)])
         self.S = nn.ModuleList([nn.Sequential(*(CNeXtBlock(self.C[i], drop_path=drop_path, layer_scale_init_value=layer_scale_init_value)
                                                 for _ in range(self.B[i]))) for i in range(4)])
         self.DownSample = nn.ModuleList([CNeXtDownSample(self.C[i], self.C[i+1], 2, 2, 0) for i in range(3)])
@@ -281,13 +281,16 @@ class ConvNeXtEncoder(nn.Module):
     def forward(self, x):
 
         x = self.stem(x)  # /4 - 96
-        x0 = self.S[0](x)
+        x = self.S[0](x)
+        x0 = self.norm[0](x)
 
         x = self.DownSample[0](x0)  # /2 - 192
-        x1 = self.S[1](x)
+        x = self.S[1](x)
+        x1 = self.norm[1](x)
 
         x = self.DownSample[1](x1)  # /2 - 384
-        x2 = self.S[2](x)
+        x = self.S[2](x)
+        x2 = self.norm[2](x)
 
         x = self.DownSample[2](x2)  # /2 - 768
         x = self.S[3](x)
@@ -345,7 +348,7 @@ class ConvNeXtUnet(nn.Module):
 
         self.name = 'ConvNeXtUnet'
 
-        self.encoder = ConvNeXtEncoder(model_type, drop_path, layer_scale_init_value)
+        self.encoder = ConvNeXtEncoder(model_type, drop_path=0.1, layer_scale_init_value=layer_scale_init_value)
         self.decoder = ConvNeXtDecoder(n_classes, model_type, drop_path, layer_scale_init_value)
 
     def forward(self, x):

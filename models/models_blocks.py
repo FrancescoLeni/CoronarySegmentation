@@ -51,11 +51,12 @@ class CNeXtBlock(nn.Module):  #come paper
 class CNeXtDownSample(nn.Module):
     def __init__(self, c1, c2, k, s, p):
         super().__init__()
-        self.norm = LayerNorm(c1)
+        # self.norm = LayerNorm(c1)
         self.conv = nn.Conv2d(c1, c2, k, s, p, bias=False)
 
     def forward(self, x):
-        x = self.conv(self.norm(x))
+        # x = self.conv(self.norm(x))
+        x = self.conv(x)
         return x
 
 
@@ -63,18 +64,19 @@ class CNeXtUpSample(nn.Module):
     def __init__(self, c1, c2, k, s, p):
         super().__init__()
         self.norm = LayerNorm(c1)
-        self.norm2 = LayerNorm(c2*2)
-        self.conv = nn.ConvTranspose2d(c1, c2, k, s, p, bias=False)
+        # self.norm2 = LayerNorm(c2*2)
+        self.convup = nn.ConvTranspose2d(c1, c2, k, s, p, bias=False)
         self.pw = nn.Conv2d(c2*2, c2, 1, 1, 0)
+
 
     def forward(self, x):
         x1, x2 = x
 
-        x1 = self.conv(self.norm(x1))
+        x1 = self.convup(self.norm(x1))
         x = torch.cat([x1, x2], dim=1)
 
-        return self.pw(self.norm2(x))
-
+        # return self.pw(self.norm2(x))
+        return self.pw(x)
 
 class UnetUpBlock3D(nn.Module):
     """ 2x up-sampling"""
