@@ -23,7 +23,7 @@ def check_load_model(model, backbone_weights, my_logger):
     else:
         my_logger.info(f'loading pretrained weights from {backbone_weights}')
         # I'm loading only the weights from the backbone
-        old = torch.load(backbone_weights)
+        old = torch.load(backbone_weights, map_location='cpu')
         filtered_state_dict = {k: old.state_dict()[k] for k in old.state_dict() if k in model.state_dict()}
         model.load_state_dict(filtered_state_dict, strict=False)
 
