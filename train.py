@@ -129,7 +129,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Parser")
     parser.add_argument('--model', type=str, required=True, help='name of model to train')
     parser.add_argument('--backbone', type=str, default=None, help='path to backbone weights, if present it ONLY loads weights for it')
-    parser.add_argument('--loss_fn', type=str, default='CE', choices= ['CE', 'FocalDice'], help='loss function to use')
+    parser.add_argument('--loss_fn', type=str, default='FocalDice', choices= ['CE', 'FocalDice'], help='loss function to use')
 
     # classes (excluding bkg)
     parser.add_argument('--n_class', type=int, default=1, help='the number of classes to segment (excluding bkg)')
