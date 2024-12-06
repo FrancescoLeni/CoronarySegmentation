@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 import random
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 from models.common import Dummy, UNet, UNet3D, UNetBig, ConvNeXtUnet
 from models.Rep_ViT import RepViTUnet, RepViTUnet3D
@@ -32,7 +33,7 @@ def compute_all_metrics(data, device, metrics_dict, num_classes=2):
 
 def main(args):
 
-    dst = Path(str(Path(args.weights).parent).replace('train', 'test') + f'_{Path(args.weights).stem}')
+    dst = Path(str(Path(args.weights).parent).replace('train', 'test').replace('weights', '') + f'{Path(args.weights).stem}' + f'_{args.reshape_mode}')
     os.makedirs(dst, exist_ok=True)
     print(f'save path is "{dst}')
 
@@ -158,6 +159,9 @@ def main(args):
         axs[2].imshow(prob, cmap='jet')
         axs[2].axis('off')
         axs[2].set_title('prediction probability')
+        divider = make_axes_locatable(axs[2])
+        cax = divider.append_axes("right", size="5%", pad=0.5)
+        cbar = f.colorbar(axs[2].images[0], cax=cax, orientation='vertical')
 
         plt.tight_layout()
         plt.savefig(dst / f'test_exemple_{n}.png', dpi=100)
