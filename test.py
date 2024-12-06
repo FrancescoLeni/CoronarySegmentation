@@ -108,6 +108,7 @@ def main(args):
     preds = torch.cat([x for x, _ in out], dim=0)
     masks = torch.cat([y for _, y in out], dim=0)
 
+    print('computing metrics...')
     compute_all_metrics((preds, masks), device, metrics_dict)
 
     # saving boxplot to dst
