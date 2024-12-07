@@ -9,6 +9,7 @@ import pandas as pd
 import numpy as np
 import random
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+import matplotlib.gridspec as gridspec
 
 from models.common import Dummy, UNet, UNet3D, UNetBig, ConvNeXtUnet
 from models.Rep_ViT import RepViTUnet, RepViTUnet3D
@@ -40,8 +41,10 @@ def main(args):
 
     if torch.cuda.is_available():
         device = torch.device('cuda')
+        batch_size = 8
     else:
         device = torch.device('cpu')
+        batch_size = 32
 
     print(f'used device: {device}')
 
@@ -72,7 +75,7 @@ def main(args):
     flag3D = any(isinstance(module, torch.nn.Conv3d) for module in model.modules())
 
     test_loader = load_all(args.data_path, reshape_mode=args.reshape_mode, crop_size=args.crop_size, scaler='standard',
-                           batch_size=args.batch_size, test_flag=True, flag_3D=flag3D)
+                           batch_size=batch_size, test_flag=True, flag_3D=flag3D)
 
     out = []
     # model.eval()
@@ -100,7 +103,7 @@ def main(args):
                                pb[1].cpu().numpy().squeeze(), pr.cpu().numpy().squeeze())
                               for i, j, pb, pr in zip(x, y, prob, pred)]
 
-            metrics_dict['Dice'].append(dice(p, y))
+            metrics_dict['Dice'].append(dice(p, y.to(device)).cpu())
             dice.reset()
 
             out.append((p, y.to(device)))
@@ -110,6 +113,14 @@ def main(args):
 
     print('computing metrics...')
     compute_all_metrics((preds, masks), device, metrics_dict)
+    cm = torchmetrics.classification.ConfusionMatrix(task="multiclass", num_classes=out_classes).to(device)
+
+    f, a = plt.subplots(1, 1, figsize=(19.2, 10.8))
+    cm_val = cm(preds, masks)
+    cm.plot(val=cm_val, ax=a)
+    plt.savefig(dst / f'ConfusionMatrix.png', dpi=100)
+    plt.close()
+    print('Confusion Matrix plotted!')
 
     # saving boxplot to dst
     f, a = plt.subplots(1,1, figsize=(14.4, 10.8))
@@ -138,7 +149,8 @@ def main(args):
             i = random.randint(0, len(im)-1)
             im, mask, prob, pred = im[i], mask[i], prob[i], pred[i]
 
-        f, axs = plt.subplots(1, 3, figsize=(14.4, 10.8))
+        f, axs = plt.subplots(1, 3, figsize=(19.2, 10.8))
+        spec = gridspec.GridSpec(1, 4, width_ratios=[1, 1, 1, 0.1], wspace=0.3)
         axs = axs.flatten()
 
         overlay_gt= np.zeros((mask.shape[0], mask.shape[1], 3))
@@ -179,7 +191,7 @@ if __name__ == '__main__':
     parser.add_argument('--n_classes', type=int, default=2, help='number of classes')
     parser.add_argument('--reshape_mode', type=str, default='crop', choices=['crop', 'grid'], help=" how to handle resize")
     parser.add_argument('--crop_size', type=int, default=128, help='the finel shape input to model')
-    parser.add_argument('--batch_size', type=int, default=32, help='batch size')
+
 
     args = parser.parse_args()
 
