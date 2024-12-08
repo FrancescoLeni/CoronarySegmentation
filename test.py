@@ -124,7 +124,8 @@ def main(args):
 
     # saving boxplot to dst
     f, a = plt.subplots(1,1, figsize=(14.4, 10.8))
-    a.boxplot(metrics_dict['Dice'], label='Dice')
+    # a.boxplot(metrics_dict['Dice'], label='Dice')
+    a.boxplot(metrics_dict['Dice'])
     a.set_title(f'Test set Dice for {args.model}')
     plt.savefig(dst / 'test_dice.png', dpi=100)
     plt.close()
