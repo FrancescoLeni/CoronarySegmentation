@@ -10,12 +10,35 @@ import numpy as np
 import random
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import matplotlib.gridspec as gridspec
+import torch.nn.functional as F
 
 from models.common import Dummy, UNet, UNet3D, UNetBig, ConvNeXtUnet
 from models.Rep_ViT import RepViTUnet, RepViTUnet3D
 from models import check_load_model
 
 from utils import my_logger
+
+
+def dice(x, y, smooth=1e-6, C=2):
+
+    x = F.softmax(x, dim=1).view(x.shape[0], C, -1)  # [N, C, *]
+
+    y = y.view(x.shape[0], -1)  # [N, *]
+
+    y_onehot = F.one_hot(y, num_classes=C).permute(0, 2, 1)  # [N, C, *]
+
+    # Compute intersection and union
+    intersection = torch.sum(x * y_onehot, dim=2)  # [N, C]
+    union = torch.sum(x.pow(2), dim=2) + torch.sum(y_onehot, dim=2)  # [N, C]
+
+    # Compute Dice coefficient
+    dice = (2 * intersection + smooth) / (union + smooth)  # [N, C]
+
+    # setting to 0 small values
+    dice[dice <= 1e-4] = 0
+
+    return dice[:, 1:].squeeze(-1).numpy().tolist()  # all classes except bkg
+
 
 def compute_all_metrics(data, device, metrics_dict, num_classes=2):
 
@@ -31,13 +54,11 @@ def compute_all_metrics(data, device, metrics_dict, num_classes=2):
     metrics_dict['Accuracy'].append(A(x, y)[1].item())
 
 
-
 def main(args):
 
     dst = Path(str(Path(args.weights).parent).replace('train', 'test').replace('weights', '') + f'{Path(args.weights).stem}' + f'_{args.reshape_mode}')
     os.makedirs(dst, exist_ok=True)
     print(f'save path is "{dst}')
-
 
     if torch.cuda.is_available():
         device = torch.device('cuda')
@@ -47,7 +68,6 @@ def main(args):
         batch_size = 32
 
     print(f'used device: {device}')
-
 
     out_classes = args.n_classes
 
@@ -78,10 +98,10 @@ def main(args):
                            batch_size=batch_size, test_flag=True, flag_3D=flag3D)
 
     out = []
-    # model.eval()
+    model.eval()
     metrics_dict = {'Dice': [], 'Precision': [], 'Recall': [], 'Accuracy': []}
 
-    dice = torchmetrics.classification.Dice(num_classes=out_classes, top_k=1, ignore_index=0).to(device)
+    # dice = torchmetrics.classification.Dice(num_classes=out_classes, top_k=1, ignore_index=0).to('cpu')
 
     np_batches = []
 
@@ -97,14 +117,26 @@ def main(args):
             pred = (pred == 1).float().squeeze()
             prob = torch.nn.functional.softmax(p, dim=1)
 
-
             # i[0] to only get channel img, p[1] to only select class 1 probs
             np_batches += [(i[0].cpu().numpy().squeeze(), j.cpu().numpy().squeeze(),
-                               pb[1].cpu().numpy().squeeze(), pr.cpu().numpy().squeeze())
-                              for i, j, pb, pr in zip(x, y, prob, pred)]
-
-            metrics_dict['Dice'].append(dice(p, y.to(device)).cpu())
-            dice.reset()
+                            pb[1].cpu().numpy().squeeze(), pr.cpu().numpy().squeeze())
+                            for i, j, pb, pr in zip(x, y, prob, pred)]
+            if flag3D:
+                depth_size = 32
+                ones_indxs = (y.view(y.shape[0]*depth_size, -1).sum(dim=1) > 0)
+                FP_idxs = (prob[:, 1, :, :, :].squeeze().reshape(prob.shape[0]*depth_size, -1).max(dim=1)[0] > 0.5)
+                indexs = ones_indxs.cpu() | FP_idxs.cpu()
+                if indexs.any():
+                    pp = p.permute(0, 2, 1, 3, 4).reshape(p.shape[0]*depth_size, p.shape[1], p.shape[3], p.shape[4])
+                    yy = y.reshape(y.shape[0]*depth_size, y.shape[2], y.shape[3])
+                    metrics_dict['Dice'].extend(dice(pp[indexs].to('cpu'), yy[indexs]))
+            else:
+                ones_indxs = (y.view(y.shape[0], -1).sum(dim=1) > 0)
+                FP_idxs = (prob[:, 1, :, :].view(prob.shape[0], -1).max(dim=1)[0] > 0.5)
+                indexs = ones_indxs.cpu() | FP_idxs.cpu()
+                if indexs.any():
+                    metrics_dict['Dice'].extend(dice(p[indexs].to('cpu'), y[indexs]))
+            # dice.reset()
 
             out.append((p, y.to(device)))
 
@@ -112,23 +144,55 @@ def main(args):
     masks = torch.cat([y for _, y in out], dim=0)
 
     print('computing metrics...')
-    compute_all_metrics((preds, masks), device, metrics_dict)
-    cm = torchmetrics.classification.ConfusionMatrix(task="multiclass", num_classes=out_classes).to(device)
+    compute_all_metrics((preds.to('cpu'), masks.to('cpu')), 'cpu', metrics_dict)
+    cm = torchmetrics.classification.ConfusionMatrix(task="multiclass", num_classes=out_classes).to('cpu')
 
     f, a = plt.subplots(1, 1, figsize=(19.2, 10.8))
-    cm_val = cm(preds, masks)
+    cm_val = cm(preds.to('cpu'), masks.to('cpu'))
     cm.plot(val=cm_val, ax=a)
     plt.savefig(dst / f'ConfusionMatrix.png', dpi=100)
     plt.close()
-    print('Confusion Matrix plotted!')
+    print('Confusion Matrix saved!')
+
+    stats_text = []
+    q1 = np.percentile(metrics_dict['Dice'], 25)
+    median = np.median(metrics_dict['Dice'])
+    q3 = np.percentile(metrics_dict['Dice'], 75)
+    iqr = q3 - q1
+    mean = np.mean(metrics_dict['Dice'])
+    stats_text.append(
+        f"  Q1: {q1:.2f}\n"
+        f"  Median: {median:.2f}\n"
+        f"  Q3: {q3:.2f}\n"
+        f"  IQR: {iqr:.2f}\n"
+        f"  Mean: {mean:.2f}\n"
+        f"  N° 0s: {np.sum(np.array(metrics_dict['Dice']) == 0)}"
+    )
 
     # saving boxplot to dst
-    f, a = plt.subplots(1,1, figsize=(14.4, 10.8))
+    f, a = plt.subplots(1, 1, figsize=(19.2, 10.8))
     a.boxplot(metrics_dict['Dice'], label='Dice')
-    a.set_title(f'Test set Dice for {args.model}')
-    plt.savefig(dst / 'test_dice.png', dpi=100)
+    a.set_title(f'Test set Dice for {dst.name}')
+    props = dict(boxstyle="round", facecolor="white", alpha=0.8)
+    text = "\n\n".join(stats_text)
+    a.text(1.02, 0.9, text, transform=a.transAxes, fontsize=10, verticalalignment='center', bbox=props)
+
+    plt.savefig(dst / 'test_dice_boxplot.png', dpi=100)
     plt.close()
     print('Dice boxplot saved!')
+
+    # dice histogram
+    f, a = plt.subplots(1, 1, figsize=(19.2, 10.8))
+
+    a.hist(metrics_dict['Dice'], bins=50, color='blue', edgecolor='black', alpha=0.7)
+    a.axvline(mean, color='red', linestyle='dashed', linewidth=2, label=f'Mean: {mean:.2f}')
+    a.axvline(median, color='green', linestyle='dashed', linewidth=2, label=f'Median: {median:.2f}')
+
+    a.set_title(f'Test set Dice for {dst.name}')
+    a.legend()
+    plt.savefig(dst / 'test_dice_hist.png', dpi=100)
+    plt.close()
+    print('Dice histogram saved!')
 
     metrics_dict['Dice'] = [np.mean(metrics_dict['Dice'])]
 
@@ -140,7 +204,6 @@ def main(args):
     # plotting 4 random crops
     random.shuffle(np_batches)
     sampled = np_batches[:4]
-
 
     for n, s in enumerate(sampled):
         im, mask, prob, pred = s
