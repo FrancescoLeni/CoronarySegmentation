@@ -65,7 +65,7 @@ def main(args):
         batch_size = 8
     else:
         device = torch.device('cpu')
-        batch_size = 32
+        batch_size = 16
 
     print(f'used device: {device}')
 
@@ -146,6 +146,9 @@ def main(args):
     print('computing metrics...')
     compute_all_metrics((preds.to('cpu'), masks.to('cpu')), 'cpu', metrics_dict)
     cm = torchmetrics.classification.ConfusionMatrix(task="multiclass", num_classes=out_classes).to('cpu')
+
+    np.save(dst / 'dice.npy', np.array(metrics_dict['Dice']))
+    print('dice array saved!')
 
     f, a = plt.subplots(1, 1, figsize=(19.2, 10.8))
     cm_val = cm(preds.to('cpu'), masks.to('cpu'))

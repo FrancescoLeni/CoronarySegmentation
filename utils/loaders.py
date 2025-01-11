@@ -65,6 +65,11 @@ class LoaderFromPath:
             my_logger.info(f'loading images from {self.data_path / folder}...')
             for f in os.listdir(self.data_path / folder):
                 # Normal or Diseased
+
+                # if self.test_flag and f == 'Diseased':
+                #     # to select just one in normal (just to plot)
+                #     continue
+
                 for i in os.listdir(self.data_path / folder / f / 'CTCA'):
                     # iterating over patients
                     if self.store_imgs:  # loads all dataset to ram
@@ -127,7 +132,10 @@ class LoaderFromPath:
                 v_patches = get_grid_patches(self.crop_size, vol[i].squeeze())
                 m_patches = get_grid_patches(self.crop_size, masks[i].squeeze())
                 # using patch ONLY if it contains at least 1 labeled point
-                out += [(np.stack((v, g), axis=0), m) for v, m, g in zip(v_patches, m_patches, g_ch) if np.max(m.ravel()) == 1]
+                if not self.test_flag:
+                    out += [(np.stack((v, g), axis=0), m) for v, m, g in zip(v_patches, m_patches, g_ch) if np.max(m.ravel()) == 1]
+                else:
+                    out += [(np.stack((v, g), axis=0), m) for v, m, g in zip(v_patches, m_patches, g_ch)]
         else:
             raise AttributeError(f'"{self.reshape_mode}" reshape_mode not valid')
         return out
@@ -149,6 +157,7 @@ class LoaderFromPath:
             clusters_list, kij_list = get_subvolumes_centroid(graph, start_id, last_id, self.crop_depth,
                                                               eps=eps, closeness=closeness)
             kij = np.array([x for sub in kij_list for x in sub])
+            # if not self.test_flag:
             g_ch[kij[:, 0], kij[:, 1], kij[:, 2]] = 1
 
             out = []
@@ -159,7 +168,8 @@ class LoaderFromPath:
                     g_crop = square_crop_3d(g_ch, self.crop_size, start, self.crop_depth, (c[0], c[1]))
                     m_crop = square_crop_3d(masks, self.crop_size, start, self.crop_depth, (c[0], c[1]))
 
-                    out.append((np.stack((v_crop, g_crop), axis=0), m_crop))
+                    # out.append((np.stack((v_crop, g_crop), axis=0), m_crop))
+                    out.append((np.expand_dims(v_crop, axis=0), m_crop))
 
         # cropping in grid-like patches
         elif self.reshape_mode == 'grid':
@@ -174,7 +184,10 @@ class LoaderFromPath:
             m_patches = get_grid_patches_3d((self.crop_size, self.crop_depth), masks, idxs)
 
             # keeping only volumes with at least 1 pixel label
-            out += [(np.stack((v, g), axis=0), m) for v, m, g in zip(v_patches, m_patches, g_ch) if np.max(m.ravel()) == 1]
+            if not self.test_flag:
+                out += [(np.stack((v, g), axis=0), m) for v, m, g in zip(v_patches, m_patches, g_ch) if np.max(m.ravel()) == 1]
+            else:
+                out += [(np.stack((v, g), axis=0), m) for v, m, g in zip(v_patches, m_patches, g_ch)]
         else:
             raise AttributeError(f'"{self.reshape_mode}" reshape_mode not valid')
 

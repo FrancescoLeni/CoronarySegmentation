@@ -194,3 +194,35 @@ def square_crop_3d(volume: np.ndarray, crop_size: int, start_id: int, crop_depth
 
     return crop
 
+
+def reconstruct_from_grid3d(crops, patch_size, crop_depth, original_shape):
+    """
+    Reconstructs the original image from the given crops.
+
+    Args:
+        - crops (list): List of 3D crops as np.array (D,H,W)
+        - patch_size (int): Desired size of the square crop
+        - crop_depth (int): Desired depth of the square crop
+        - original_shape (tuple): Original shape of the image (d,h,w).
+
+    returns:
+        - reconstructed_vol (np.array): Reconstructed volume.
+    """
+
+    d, h, w = original_shape
+    # Initialize the reconstructed volume and a counter array for normalization
+    reconstructed_vol = np.zeros((d, h, w))
+
+    # Iterate over the same coordinates as in the cropping process
+    crop_idx = 0  # Index for the crops list
+
+    for y in range(0, h - patch_size + 1, patch_size):
+        for x in range(0, w - patch_size + 1, patch_size):
+            for z in range(0, d - crop_depth + 1, crop_depth):
+                crop = crops[crop_idx]
+                crop_idx += 1
+
+                # Add the crop to the reconstructed volume
+                reconstructed_vol[z:z + crop_depth, y:y + patch_size, x:x + patch_size] += crop
+
+    return reconstructed_vol
