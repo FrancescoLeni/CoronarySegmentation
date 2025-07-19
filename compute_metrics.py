@@ -30,7 +30,7 @@ def get_left_out_stats(crop_size, data_path=Path('ASOCA'), dst='data/graph', sav
             for category in ['Normal', 'Diseased']:  #
                 ctca_path = data_path / f / category / 'CTCA'
                 for i in os.listdir(ctca_path):  
-                    print(f"Processando file {i} nella directory {ctca_path}")
+                    print(f"Processing file {i} in directory {ctca_path}")
                     volume, masks = load_single_volume(ctca_path / i)
 
                     g_name = volume.name.replace('ASOCA/', '')
@@ -105,7 +105,7 @@ def get_crops_snr(crop_size, data_path=Path('ASOCA'), save=False, dst='data/grap
 
         
             if not ctca_path.exists() or not graphs_path.exists():
-                print(f"Percorso non trovato: {ctca_path} o {graphs_path}")
+                print(f"file not found: {ctca_path} o {graphs_path}")
                 continue
 
             
@@ -113,10 +113,10 @@ def get_crops_snr(crop_size, data_path=Path('ASOCA'), save=False, dst='data/grap
                 file_ctca = ctca_path / i
 
                 if not file_ctca.is_file():
-                    print(f"File non trovato o non valido: {file_ctca}")
+                    print(f"File not found  or not valido: {file_ctca}")
                     continue
 
-                print(f"Processando file {i} nella directory {ctca_path}")
+                print(f"Processing file {i} in directory {ctca_path}")
 
                 
                 volume, masks = load_single_volume(file_ctca)
@@ -126,7 +126,7 @@ def get_crops_snr(crop_size, data_path=Path('ASOCA'), save=False, dst='data/grap
                 graph_file = graphs_path / f'{g_name}{graph_type}.GML'
 
                 if not graph_file.exists():
-                    print(f"File del grafo non trovato: {graph_file}")
+                    print(f"graph file not found: {graph_file}")
                     continue
 
                 

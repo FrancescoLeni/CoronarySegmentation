@@ -253,6 +253,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Parser")
     parser.add_argument('--model', type=str, required=True, help='name of model to train')
     parser.add_argument('--weights', type=str, required=True, help='path to weights')
+
     parser.add_argument('--data_path', type=str, default='ASOCA_DATASET', help='path to ASOCA dataset')
     parser.add_argument('--n_classes', type=int, default=2, help='number of classes')
     parser.add_argument('--reshape_mode', type=str, default='crop', choices=['crop', 'grid'], help=" how to handle resize")

@@ -128,18 +128,18 @@ if __name__ == "__main__":
     # list of arguments (ADJUST for student and SAM)
     parser = argparse.ArgumentParser(description="Parser")
     parser.add_argument('--model', type=str, required=True, help='name of model to train')
-    parser.add_argument('--backbone', type=str, default=None, help='path to backbone weights, if present it ONLY loads weights for it')
-    parser.add_argument('--loss_fn', type=str, default='FocalDice', choices= ['CE', 'FocalDice'], help='loss function to use')
+    parser.add_argument('--batch_size', type=int, required=True, help='batch size')
+    parser.add_argument('--epochs', type=int, required=True, help='number of epochs')
 
     # classes (excluding bkg)
     parser.add_argument('--n_class', type=int, default=1, help='the number of classes to segment (excluding bkg)')
 
     # reshaping BOTH needed
+    parser.add_argument('--backbone', type=str, default=None, help='path to backbone weights, if present it ONLY loads weights for it')
+    parser.add_argument('--loss_fn', type=str, default='FocalDice', choices= ['CE', 'FocalDice'], help='loss function to use')
     parser.add_argument('--reshape_mode', type=str, default='crop', choices=[None, 'crop', 'grid'], help=" how to handle resize")
-    parser.add_argument('--crop_size', type=int, default=128, help='the finel shape input to model')
+    parser.add_argument('--crop_size', type=int, default=128, help='the final shape input to model')
     parser.add_argument('--scaler', type=str, default='standard', choices=['standard', 'min_max'], help='name of the scaler to use')
-    parser.add_argument('--epochs', type=int, required=True, help='number of epochs')
-    parser.add_argument('--batch_size', type=int, required=True, help='batch size')
     parser.add_argument('--folder', type=str, default=None, help='name of folder to which saving results inside runs/train')
     parser.add_argument('--name', type=str, default="exp", help='name of experiment folder inside folder')
     parser.add_argument('--opt', type=str, default="AdamW", choices=["SGD", "Adam", "AdamW"], help='name of optimizer to use')

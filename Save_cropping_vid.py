@@ -36,7 +36,7 @@ c, p = clusters_list[3], kij_list[3]
 print(start_id, last_id)
 print(len(kij_list), kij_list[0].shape)
 
-dst = r'C:\Users\franc\OneDrive\runs'
+dst = r'runs'
 
 # Video writer setup
 frame_height, frame_width = 512, 512 # Dimensions of each slice

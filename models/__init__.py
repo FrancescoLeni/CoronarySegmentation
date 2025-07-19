@@ -138,8 +138,8 @@ class ModelClass(nn.Module):
                         self.scaler.unscale_(self.opt)
                         torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.grad_clip)
 
-                        self.scaler.step(self.opt)
-                        self.scaler.update()
+                    self.scaler.step(self.opt)
+                    self.scaler.update()
             else:
                 outputs = self.model(inputs)
 

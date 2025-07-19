@@ -4,10 +4,10 @@ import cv2
 import nrrd
 import imageio
 
-p_rec, _ = nrrd.read(r'C:\Users\franc\OneDrive\runs\reconstructed_preds_N20.nrrd')
-x_rec, _ = nrrd.read(r'C:\Users\franc\OneDrive\runs\reconstructed_CT_N20.nrrd')
-y_rec, _ = nrrd.read(r'C:\Users\franc\OneDrive\runs\reconstructed_masks_N20.nrrd')
-dst = r'C:\Users\franc\OneDrive\runs'
+p_rec, _ = nrrd.read(r'runs\reconstructed_preds_N20.nrrd')
+x_rec, _ = nrrd.read(r'runs\reconstructed_CT_N20.nrrd')
+y_rec, _ = nrrd.read(r'runs\reconstructed_masks_N20.nrrd')
+dst = r'runs'
 
 p_rec = p_rec[15:146]
 x_rec = x_rec[15:146]
