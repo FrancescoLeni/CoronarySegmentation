@@ -8,6 +8,12 @@ The pipeline supports full-volume preprocessing, 2D and 3D segmentation workflow
 
 To enhance segmentation performance and encourage anatomical awareness, this project integrates **coronary centerline information** into the model training pipeline in two key ways: intelligent cropping and attention-based input encoding.
 
+<p align="center">
+  <img src="repo_data/cropping.gif" alt="cropping" width="320"/>
+  <img src="repo_data/fix%20grid.gif" alt="grid" width="320"/>
+</p>
+
+
 ---
 
 ### 🗂️ ROI Cropping
@@ -31,6 +37,37 @@ To further emphasize coronary structures during training, we introduce a form of
 
 Together, these centerline-driven strategies inject prior anatomical knowledge into the training process, resulting in more accurate, focused, and data-efficient coronary segmentation.
 
+---
+
+## 🧠 Model Architecture
+
+This work explores both **2D** and **3D U-Net architectures** for coronary artery segmentation. The goal was to determine whether volumetric context (via 3D convolutions) and anatomically-aware cropping could enhance segmentation performance on the ASOCA dataset.
+
+- **2D U-Net**: Applied slice-by-slice with or without centerline-guided cropping.
+- **3D U-Net**: Processes volumetric patches, enabling the model to learn spatial continuity across adjacent slices.
+
+Both models were trained under two different input sampling strategies:
+- **Grid**: Traditional uniform slicing across the volume.
+- **Crop**: Centerline-guided region-of-interest cropping (see [Centerline Prior](#-centerline-prior)).
+
+### 🔬 Key Findings
+
+The **3D U-Net architecture** combined with **centerline-guided cropping** achieved the best overall performance across all evaluated metrics. This supports the hypothesis that anatomical priors and 3D spatial context are beneficial for fine-grained vessel segmentation.
+
+---
+
+### 📊 Quantitative Results
+
+| Metric     | 3D U-Net + Crop | 3D U-Net + grid |
+|------------|------------------|-----------------|
+| **Dice**        | **0.87**         | 0.80            |
+| **Accuracy**    | **0.94**           | 0.91            |
+| **Precision**   | **0.84**           | 0.83            |
+| **Recall**      | **0.94**         | 0.92            |
+
+> 📌 All values are averaged across the test set using 3D predictions with post-processing.
+
+---
 
 
 ## ⚙️ Requirements & Setup
@@ -39,13 +76,14 @@ To get started, clone the repository and set up your environment using one of th
 
 ### 🔁 1. Clone the Repository
 
-```bash
+```
 git clone https://github.com/FrancescoLeni/CoronarySegmentation.git
 cd CoronarySegmentation
+```
 
-```bash
+```
 pip -r install requirements.txt
-
+```
 
 
 
