@@ -57,13 +57,23 @@ The **3D U-Net architecture** combined with **centerline-guided cropping** achie
 ---
 
 ### 📊 Quantitative Results
+## 📊 Quantitative Results
 
-| Metric     | 3D U-Net + Crop | 3D U-Net + grid |
-|------------|------------------|-----------------|
-| **Dice**        | **0.87**         | 0.80            |
-| **Accuracy**    | **0.94**           | 0.91            |
-| **Precision**   | **0.84**           | 0.83            |
-| **Recall**      | **0.94**         | 0.92            |
+| Metric     | 3D U-Net + Crop | 3D U-Net + Grid |
+|------------|------------------|------------------|
+| **Dice**        | **0.87**          | 0.80             |
+| **Accuracy**    | **0.94**          | 0.92             |
+| **Precision**   | **0.84**          | 0.83             |
+| **Recall**      | **0.94**          | 0.92             |
+
+---
+
+## 🎥 Qualitative Results
+
+<p align="center">
+  <img src="repo_data/3d%20result_pred.gif" alt="3D U-Net + Crop" width="400" />
+  <img src="repo_data/3d%20result_gt.gif" alt="3D U-Net + Grid" width="400" />
+</p>
 
 > 📌 All values are averaged across the test set using 3D predictions with post-processing.
 
