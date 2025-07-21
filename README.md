@@ -56,7 +56,6 @@ The **3D U-Net architecture** combined with **centerline-guided cropping** achie
 
 ---
 
-### 📊 Quantitative Results
 ## 📊 Quantitative Results
 
 | Metric     | 3D U-Net + Crop | 3D U-Net + Grid |
@@ -71,8 +70,8 @@ The **3D U-Net architecture** combined with **centerline-guided cropping** achie
 ## 🎥 Qualitative Results
 
 <p align="center">
-  <img src="repo_data/3d%20result_pred.gif" alt="3D U-Net + Crop" width="400" />
-  <img src="repo_data/3d%20result_gt.gif" alt="3D U-Net + Grid" width="400" />
+  <img src="repo_data/3d%20result pred.gif" alt="3D U-Net + Crop" width="400" />
+  <img src="repo_data/3d%20result.gif" alt="3D U-Net + Grid" width="400" />
 </p>
 
 > 📌 All values are averaged across the test set using 3D predictions with post-processing.
@@ -82,7 +81,7 @@ The **3D U-Net architecture** combined with **centerline-guided cropping** achie
 
 ## ⚙️ Requirements & Setup
 
-To get started, clone the repository and set up your environment using one of the following options:
+To get started, clone the repository and set up your environment:
 
 ### 🔁 1. Clone the Repository
 
@@ -95,7 +94,58 @@ cd CoronarySegmentation
 pip -r install requirements.txt
 ```
 
+## 🧪 Experiments
+
+### 📂 Dataset
+
+The dataset used in this study is the **[ASOCA (Automatic Segmentation of Coronary Arteries) dataset](https://asoca.grand-challenge.org/)**. You must request access through the challenge page. Once downloaded, please organize the dataset as follows inside a `dataset/` directory:
 
 
+```
+dataset/
+├── train/
+│ ├── Normal/
+│ │ └── CTCA/<PatientID>/
+│ └── Diseased/
+│ └── CTCA/<PatientID>/
+├── val/
+│ ├── Normal/
+│ │ └── CTCA/<PatientID>/
+│ └── Diseased/
+│ └── CTCA/<PatientID>/
+└── test/
+├── Normal/
+│ └── CTCA/<PatientID>/
+└── Diseased/
+└── CTCA/<PatientID>/
+```
 
+### 🧠 Pretrained Weights
+
+You can download pretrained model weights from the following link:
+
+🔗 **[Download Pretrained Weights](https://www.dropbox.com/scl/fo/)**  
+
+---
+
+### 🚀 Running Training
+
+Use the following command to train a model (e.g., 3D U-Net with centerline cropping):
+
+```
+python train.py --model unet3d_crop --epochs <n° epochs> --batch_size <batch size>
+```
+
+Use the following command to test a trained model:
+
+```
+python test.py --model unet3d_crop --weights <path_to_weights>
+```
+
+## 🙏 Acknowledgments
+
+We would like to thank the authors of the following repositories for their contributions, which were instrumental to this work:
+
+- [DatasetUtilities](https://github.com/AAMIASoftwares-research/DatasetUtilities): for essential tools to load, align, and manage coronary CT volumes and annotations.
+- [HCATNetwork](https://github.com/AAMIASoftwares-research/HCATNetwork): for implementing helpful utilities to process and manage centerline graph representations.
 
