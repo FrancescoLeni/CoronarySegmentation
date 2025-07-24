@@ -61,7 +61,7 @@ The **3D U-Net architecture** combined with **centerline-guided cropping** achie
 | Metric     | 3D U-Net + Crop | 3D U-Net + Grid |
 |------------|------------------|------------------|
 | **Dice**        | **0.87**          | 0.80             |
-| **Accuracy**    | **0.94**          | 0.92             |
+| **Accuracy**    | **0.94**          | 0.90             |
 | **Precision**   | **0.84**          | 0.83             |
 | **Recall**      | **0.94**          | 0.92             |
 
